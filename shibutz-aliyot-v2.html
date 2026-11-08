@@ -608,6 +608,14 @@ function formatDate(iso){
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 function genId(){ return 'w'+Math.random().toString(36).slice(2,9); }
+function escHtml(str){
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // normalizes an Israeli-style local number (05X-XXXXXXX) or an already-international one
 // into the digits-only format wa.me expects (country code, no + or leading 0)
@@ -958,7 +966,9 @@ function exportBackup(){
     exportedAt: new Date().toISOString(),
     congregants: STATE.congregants,
     weeklyLog: STATE.weeklyLog,
-    parashot: STATE.parashot
+    parashot: STATE.parashot,
+    matchSettings: STATE.matchSettings,
+    whatsappTemplate: STATE.whatsappTemplate
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -977,6 +987,17 @@ function importBackup(data){
   STATE.congregants = data.congregants;
   STATE.weeklyLog = data.weeklyLog;
   STATE.parashot = data.parashot || {};
+  if(data.matchSettings && typeof data.matchSettings === 'object'){
+    const lo = Math.max(10, Math.min(100, parseInt(data.matchSettings.lower, 10) || 65));
+    const hi = Math.max(lo + 5, Math.min(300, parseInt(data.matchSettings.upper, 10) || 130));
+    const sm = data.matchSettings.strongMin != null ? Math.max(3, Math.min(200, parseInt(data.matchSettings.strongMin, 10) || 30)) : 30;
+    STATE.matchSettings = { lower: lo, upper: hi, strongMin: sm };
+    saveMatchSettings();
+  }
+  if(Object.prototype.hasOwnProperty.call(data, 'whatsappTemplate')){
+    STATE.whatsappTemplate = data.whatsappTemplate || null;
+    saveWhatsappTemplate();
+  }
   saveCongregants();
   saveWeeklyLog();
   saveParashot();
@@ -1018,7 +1039,8 @@ function parseCongregantsCsv(text){
     const levelRaw = (cols[1]||'').trim();
     const phone = (cols[2]||'').trim();
     const unrestricted = /^(חזק|strong)$/i.test(levelRaw);
-    const level = unrestricted ? 100 : (parseInt(levelRaw)||20);
+    const parsedLvl = parseInt(levelRaw, 10);
+    const level = unrestricted ? 100 : Math.max(3, (isNaN(parsedLvl) || parsedLvl <= 0) ? 20 : parsedLvl);
     const existing = STATE.congregants.find(c=>c.name===name);
     if(existing) toUpdate.push({existing, level, unrestricted, phone});
     else toAdd.push({name, level, unrestricted, phone});
@@ -1169,28 +1191,102 @@ function resolvePerson(id){
     const name = id.slice(6);
     return { id, name: name ? `${name} (אורח)` : 'אורח (ללא שם)', unrestricted:true, isGuest:true, level:0 };
   }
-  return STATE.congregants.find(c=>c.id===id) || null;
+  if(id.startsWith('deleted:')){
+    const name = id.slice(8);
+    return { id, name: name ? `${name} (נמחק)` : 'מתפלל שנמחק', unrestricted:true, isGuest:true, isDeleted:true, level:0 };
+  }
+  const found = STATE.congregants.find(c=>c.id===id);
+  if(found) return found;
+  return { id, name: 'מתפלל שנמחק', unrestricted:true, isGuest:true, isDeleted:true, level:0 };
+}
+
+function deleteCongregantById(delId){
+  const person = STATE.congregants.find(c=>c.id===delId);
+  const deletedTag = 'deleted:' + (person && person.name ? person.name : 'מתפלל שנמחק');
+  let logChanged = false;
+  for(const w of STATE.weeklyLog){
+    if(w.assign){
+      for(const k of Object.keys(w.assign)){
+        if(w.assign[k] === delId){
+          w.assign[k] = deletedTag;
+          logChanged = true;
+        }
+      }
+    }
+    if(Array.isArray(w.deferred) && w.deferred.includes(delId)){
+      w.deferred = w.deferred.filter(x=>x!==delId);
+      logChanged = true;
+    }
+  }
+  if(STATE.pendingLocks){
+    for(const k of Object.keys(STATE.pendingLocks)){
+      if(STATE.pendingLocks[k] === delId) delete STATE.pendingLocks[k];
+    }
+  }
+  if(STATE.current){
+    if(STATE.current.assign){
+      for(const k of Object.keys(STATE.current.assign)){
+        if(STATE.current.assign[k] === delId){
+          delete STATE.current.assign[k];
+          if(STATE.current.recencyWarnings) delete STATE.current.recencyWarnings[k];
+        }
+      }
+    }
+    if(STATE.current.locks){
+      for(const k of Object.keys(STATE.current.locks)){
+        if(STATE.current.locks[k] === delId) delete STATE.current.locks[k];
+      }
+    }
+    if(Array.isArray(STATE.current.deferred)) STATE.current.deferred = STATE.current.deferred.filter(x=>x!==delId);
+    if(Array.isArray(STATE.current.recentlyExcluded)) STATE.current.recentlyExcluded = STATE.current.recentlyExcluded.filter(x=>x!==delId);
+    saveCurrent();
+  }
+  STATE.congregants = STATE.congregants.filter(c=>c.id!==delId);
+  saveCongregants();
+  if(logChanged) saveWeeklyLog();
 }
 
 // How many parashot back (by fixed reading-cycle order, not calendar date) a person's last
 // confirmed reading was from the given parasha. This is the real recency signal - see
 // parashaGap's comment for why the date field alone isn't trustworthy enough to gate on.
-function parashaGapSinceLastRead(stats, parashaName){
+// Edge case handled: when `fromName` and `toName` map to the SAME cycle position (either the
+// exact same parasha name, or a combined parasha vs. its split part like "ויקהל" -> "ויקהל-פקודי"),
+// we check whether the last reading was recent (< 180 days / within the last 2 log entries) vs.
+// a full year ago (~54 weeks back). Recent same-parasha readings return gap 1 (blocked by Iron Rule).
+function parashaGapSinceLastRead(stats, parashaName, refDate){
   if(!stats || !stats.lastEntry || !stats.lastEntry.parasha) return Infinity;
-  return parashaGap(stats.lastEntry.parasha, parashaName);
+  const lastParasha = stats.lastEntry.parasha;
+  const g = parashaGap(lastParasha, parashaName);
+  const sameStartIdx = parashaOrderIndex(lastParasha, false) !== null &&
+    parashaOrderIndex(lastParasha, false) === parashaOrderIndex(parashaName, false);
+  if(g === PARASHA_CYCLE_LEN || sameStartIdx){
+    const targetDate = refDate || (STATE.current && STATE.current.date) || STATE.pendingDate || '';
+    if(stats.lastEntry.date && targetDate){
+      const d1 = new Date(stats.lastEntry.date), d2 = new Date(targetDate);
+      if(!isNaN(d1) && !isNaN(d2)){
+        const diffDays = Math.abs((d2 - d1) / (1000*60*60*24));
+        if(diffDays < 180) return 1;
+        return PARASHA_CYCLE_LEN;
+      }
+    }
+    if(stats.lastEntry.logIdx != null && STATE.weeklyLog.length > 0 && (STATE.weeklyLog.length - 1 - stats.lastEntry.logIdx) <= 2){
+      return 1;
+    }
+  }
+  return g;
 }
 // Iron rule (no exceptions, ever): the immediately preceding parasha (gap of 1) makes someone
 // completely ineligible this week - not a low-priority option, not a last resort, invisible to
 // the algorithm entirely. Callers filter pools with this before any fairness/fit logic runs.
-function isRecencyBlocked(stats, parashaName){
-  return parashaGapSinceLastRead(stats, parashaName) <= 1;
+function isRecencyBlocked(stats, parashaName, refDate){
+  return parashaGapSinceLastRead(stats, parashaName, refDate) <= 1;
 }
 // Soft rule: a gap of 2 parashot back ("read within the last Shabbat beyond the immediately
 // preceding one") is allowed if nothing better is available, but should surface a written
 // warning to the gabbai rather than passing silently. 3+ parashot back (or never read) is the
 // clean, unflagged case - "3 weeks and up is the ideal" per the rule as given.
-function isRecencyWarning(stats, parashaName){
-  const g = parashaGapSinceLastRead(stats, parashaName);
+function isRecencyWarning(stats, parashaName, refDate){
+  const g = parashaGapSinceLastRead(stats, parashaName, refDate);
   return g > 1 && g < 3;
 }
 // Finds the best available candidate in a fairness-sorted pool for a given fit test, honoring the
@@ -1198,8 +1294,8 @@ function isRecencyWarning(stats, parashaName){
 // falls back to someone in the 2-parashot warning zone if no clean candidate fits. The pool
 // itself must already exclude anyone hard-blocked (gap of 1) - see isRecencyBlocked - this
 // function only chooses between the remaining two tiers.
-function findFairCandidate(pool, usedSet, fitTest, parashaName){
-  let person = pool.find(p => !usedSet.has(p.id) && fitTest(p) && !isRecencyWarning(getCongStats(p.id), parashaName));
+function findFairCandidate(pool, usedSet, fitTest, parashaName, refDate){
+  let person = pool.find(p => !usedSet.has(p.id) && fitTest(p) && !isRecencyWarning(getCongStats(p.id), parashaName, refDate));
   if(person) return { person, recentGap:false };
   person = pool.find(p => !usedSet.has(p.id) && fitTest(p));
   if(person) return { person, recentGap:true };
@@ -1208,8 +1304,10 @@ function findFairCandidate(pool, usedSet, fitTest, parashaName){
 
 function fits(person, pesukim){
   if(person.unrestricted) return true; // strong reader - no real ceiling, any aliyah is fair game
-  const lowerPct = (STATE.matchSettings && STATE.matchSettings.lower) || 80;
-  const upperPct = (STATE.matchSettings && STATE.matchSettings.upper) || 110;
+  const rawLo = (STATE.matchSettings && STATE.matchSettings.lower) || 80;
+  const rawHi = (STATE.matchSettings && STATE.matchSettings.upper) || 110;
+  const lowerPct = Math.min(rawLo, rawHi);
+  const upperPct = Math.max(rawLo, rawHi);
   const min = person.level * (lowerPct/100);
   const max = person.level * (upperPct/100);
   return pesukim >= min - 1e-6 && pesukim <= max + 1e-6;
@@ -1298,15 +1396,19 @@ function explainQueuePerson(person, weekEntry, split, statsMap){
       return {selected:true, aliyahNum:i, recencyWarning: warn || null};
     }
   }
+  const meStats = statsMap[person.id] || {total:0, lastEntry:null};
   // iron rule: reading within the last week makes someone entirely invisible to the algorithm
   // this week (see runAssignment) - check this BEFORE the normal fit-based reasoning below, or
   // it would wrongly claim someone else was merely "earlier in the fairness queue" when the real
   // reason is the no-two-weeks-in-a-row rule, not fairness ranking.
-  if(isRecencyBlocked(statsMap[person.id], weekEntry.parasha)){
-    const lastParasha = statsMap[person.id].lastEntry.parasha;
+  if(isRecencyBlocked(meStats, weekEntry.parasha, weekEntry.date)){
+    const lastParasha = meStats.lastEntry.parasha;
     return {selected:false, reason:`קרא בפרשת ${lastParasha} - הפרשה הקודמת - כלל הברזל אוסר לשבץ שוב שבוע אחרי שבוע.`};
   }
   if(person.unrestricted){
+    if(isRecencyWarning(meStats, weekEntry.parasha, weekEntry.date)){
+      return {selected:false, reason:`קרא לפני 2 שבתות (פרשת ${meStats.lastEntry.parasha}) — העדיפות ניתנה למתפללים שעברו לפחות 3 שבתות מאז קריאתם האחרונה.`};
+    }
     // Strong readers compete directly on the largest aliyot of the parasha and step in as fallback
     // on any remaining open aliyot. If a strong reader wasn't selected, explain who took the big
     // aliyot / strong-reader slots ahead of them in the fairness queue.
@@ -1315,7 +1417,7 @@ function explainQueuePerson(person, weekEntry, split, statsMap){
       const id = assign[i]||assign[String(i)];
       if(!id || id.startsWith('guest:')) continue;
       const p = resolvePerson(id);
-      if(p && p.unrestricted) strongWinners.push(p.name);
+      if(p && p.unrestricted && !p.isGuest) strongWinners.push(p.name);
     }
     return strongWinners.length===0
       ? {selected:false, reason:'כל שבע העליות (כולל העליות הגדולות) שובצו למתפללים רגילים שקדמו לו בתור ההוגנות בשבת הזו.'}
@@ -1335,25 +1437,60 @@ function explainQueuePerson(person, weekEntry, split, statsMap){
       return {selected:false, actionable:true, aliyahNum:i, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו וטרם שובצה — אפשר לשבץ אותו אליה ידנית.`};
     }
   }
-  // otherwise, every aliyah that fits him already went to someone else in the queue
+  // If this person was in the 2-week warning zone, clean-gap readers get priority even with a higher total
+  if(isRecencyWarning(meStats, weekEntry.parasha, weekEntry.date)){
+    return {selected:false, reason:`קרא לפני 2 שבתות (פרשת ${meStats.lastEntry.parasha}) — העדיפות בעליות המתאימות ניתנה למתפללים שעברו לפחות 3 שבתות מאז קריאתם האחרונה.`};
+  }
+  // Prefer explaining via a fitting aliyah whose holder was ahead of or equal to `person` in the fairness queue
+  for(const i of fittingAliyot){
+    const takenId = assign[i] || assign[String(i)];
+    const taken = resolvePerson(takenId);
+    if(!taken || taken.isGuest) continue;
+    const takenStats = statsMap[taken.id] || {total:0};
+    if(takenStats.total < meStats.total){
+      return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אבל ניתנה ל${taken.name} (${takenStats.total} עליות אז, לעומת ${meStats.total} שלו — קודם לו בתור ההוגנות).`};
+    }
+    if(takenStats.total === meStats.total){
+      return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אבל ניתנה ל${taken.name} (גם לו ${takenStats.total} עליות — קודם לו בתור לפי זמן ההמתנה/שובר שוויון).`};
+    }
+  }
   const i = fittingAliyot[0];
   const takenId = assign[i] || assign[String(i)];
   const taken = resolvePerson(takenId);
+  const locks = weekEntry.locks || {};
+  if(locks[i] || locks[String(i)]){
+    return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אך ננעלה ידנית מראש עבור ${taken ? taken.name : 'אחר'}.`};
+  }
   if(taken && taken.isGuest){
     return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אבל ניתנה לאורח.`};
   }
+  if(taken && taken.unrestricted){
+    return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} (${split[i-1]} פסוקים) מתאימה לו, אך ניתנה לקורא החזק ${taken.name} במסגרת העדפת קוראים חזקים לעליות ארוכות.`};
+  }
   if(taken){
-    const takenStats = statsMap[taken.id] || {total:0}, meStats = statsMap[person.id] || {total:0};
-    return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אבל ניתנה ל${taken.name} (${takenStats.total} עליות אז, לעומת ${meStats.total} שלו — קודם לו בתור ההוגנות).`};
+    return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אך שובצה ל${taken.name} במסגרת אופטימיזציית התאמת הפסוקים השבועית.`};
   }
   return {selected:false, reason:`עלייה ${ALIYAH_NAMES[i-1]} מתאימה לו, אך לא שובצה.`};
 }
 
 function runAssignment(parashaName, date, locks){
   locks = locks || {};
+  // Sanitize & deduplicate locks so the same congregant can never be locked into two aliyot simultaneously
+  const cleanLocks = {};
+  const lockedCongIds = new Set();
+  for(const k of Object.keys(locks)){
+    const v = locks[k];
+    if(!v) continue;
+    if(String(v).startsWith('guest:')){
+      cleanLocks[k] = v;
+    } else if(!lockedCongIds.has(v) && STATE.congregants.some(c=>c.id===v)){
+      cleanLocks[k] = v;
+      lockedCongIds.add(v);
+    }
+  }
+  locks = cleanLocks;
   const split = getSplit(parashaName);
   let assign = {...locks};
-  const lockedCongIds = new Set(Object.values(locks).filter(v=>v && !v.startsWith('guest:')));
   let remaining = split
     .map((p,i)=>({aliyahNum:i+1, pesukim:p}))
     .filter(a=>!assign[a.aliyahNum]);
@@ -1363,10 +1500,10 @@ function runAssignment(parashaName, date, locks){
   // filtered out of both pools before anything else runs. Locked people (explicit manual
   // overrides, e.g. a bar mitzvah) are a deliberate exception to everything, recency included.
   const cmpForParasha = (a,b) => fairnessCompare(a, b, parashaName);
-  const strongPool = STATE.congregants.filter(c=>c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName)).sort(cmpForParasha);
-  const normalPool = STATE.congregants.filter(c=>!c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName)).sort(cmpForParasha);
+  const strongPool = STATE.congregants.filter(c=>c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName, date)).sort(cmpForParasha);
+  const normalPool = STATE.congregants.filter(c=>!c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName, date)).sort(cmpForParasha);
   const recentlyExcluded = STATE.congregants
-    .filter(c=>!c.paused && !lockedCongIds.has(c.id) && isRecencyBlocked(getCongStats(c.id), parashaName))
+    .filter(c=>!c.paused && !lockedCongIds.has(c.id) && isRecencyBlocked(getCongStats(c.id), parashaName, date))
     .map(c=>c.id);
   const usedNormal = new Set();
   const usedStrong = new Set();
@@ -1668,16 +1805,35 @@ function suggestReplacementForAliyah(aliyahNum){
     notice('לא נמצא מחליף פנוי אחר שמתאים לעלייה זו (ללא הפרת כלל הברזל).');
     return;
   }
-  assign[aliyahNum] = nextPerson.id;
-  if(!STATE.current.recencyWarnings) STATE.current.recencyWarnings = {};
-  if(isRecencyWarning(statsMap[nextPerson.id], parashaName)){
-    STATE.current.recencyWarnings[aliyahNum] = `${nextPerson.name} קרא לאחרונה לפני פחות מ-3 שבתות - זו הייתה האפשרות הכי טובה שנמצאה, כדאי לשים לב.`;
-  } else {
-    delete STATE.current.recencyWarnings[aliyahNum];
-  }
-  if(STATE.current.unfilledReasons) delete STATE.current.unfilledReasons[aliyahNum];
-  saveCurrent();
+  updateDraftSlotAssignment(aliyahNum, nextPerson.id);
   render();
+}
+
+// Centrally updates a single aliyah slot on the open draft (`STATE.current`), ensuring stale
+// `unfilledReasons`, `waSent`, and `recencyWarnings` from the previous occupant are cleared and
+// recalculated accurately for the newly selected person.
+function updateDraftSlotAssignment(aliyahNum, newCongId){
+  if(!STATE.current) return;
+  const key = String(aliyahNum);
+  if(!STATE.current.assign) STATE.current.assign = {};
+  if(newCongId) STATE.current.assign[key] = newCongId;
+  else delete STATE.current.assign[key];
+  if(STATE.current.waSent) delete STATE.current.waSent[key];
+  if(STATE.current.unfilledReasons) delete STATE.current.unfilledReasons[key];
+  if(!STATE.current.recencyWarnings) STATE.current.recencyWarnings = {};
+  delete STATE.current.recencyWarnings[key];
+  if(newCongId && !String(newCongId).startsWith('guest:') && !String(newCongId).startsWith('deleted:')){
+    const p = resolvePerson(newCongId);
+    const st = getCongStats(newCongId);
+    if(p && !p.isGuest){
+      if(isRecencyBlocked(st, STATE.current.parasha, STATE.current.date)){
+        STATE.current.recencyWarnings[key] = `${p.name} קרא בפרשה הקודמת (${st.lastEntry.parasha}) — שים לב ששיבוץ ידני זה חורג מכלל הברזל.`;
+      } else if(isRecencyWarning(st, STATE.current.parasha, STATE.current.date)){
+        STATE.current.recencyWarnings[key] = `${p.name} קרא לאחרונה לפני פחות מ-3 שבתות - כדאי לשים לב.`;
+      }
+    }
+  }
+  saveCurrent();
 }
 
 function confirmAssignment(){
@@ -1715,8 +1871,11 @@ function doConfirmAssignment(){
 function updateLogAssignment(weekId, aliyahNum, newCongId){
   const entry = STATE.weeklyLog.find(w=>w.id===weekId);
   if(!entry) return;
-  if(newCongId) entry.assign[aliyahNum] = newCongId;
-  else delete entry.assign[aliyahNum];
+  const key = String(aliyahNum);
+  if(newCongId) entry.assign[key] = newCongId;
+  else delete entry.assign[key];
+  if(entry.unfilledReasons) delete entry.unfilledReasons[key];
+  if(entry.recencyWarnings) delete entry.recencyWarnings[key];
   saveWeeklyLog();
   render();
 }
@@ -2041,7 +2200,7 @@ function buildSmartSelectOptions(parashaName, pesukim, aliyahIdx, assignedId, as
     else if(isRecentWarn) statusSuffix = ' — קרא לפני 2 שבתות';
     else if(!isFit) statusSuffix = pesukim > c.level ? ' — מעל הטווח' : ' — מתחת לטווח';
 
-    const optHtml = `<option value="${c.id}" ${assignedId===c.id?'selected':''} ${heldElsewhere?'disabled':''}>${c.name} (${capText} · ${totalText})${statusSuffix}</option>`;
+    const optHtml = `<option value="${c.id}" ${assignedId===c.id?'selected':''} ${heldElsewhere?'disabled':''}>${escHtml(c.name)} (${capText} · ${totalText})${statusSuffix}</option>`;
 
     if(heldElsewhere || c.paused || isIronBlocked){
       blocked.push(optHtml);
@@ -2113,9 +2272,10 @@ function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings, opts)
         <select data-aliyah="${i}">
           <option value="">${isLockMode ? '— ללא נעילה —' : '— לא שובץ —'}</option>
           ${optionsHtml}
+          ${(person && person.isDeleted) ? `<option value="${escHtml(assignedId)}" selected>${escHtml(person.name)}</option>` : ''}
           <option value="guest" ${isGuest?'selected':''}>👤 אורח (שם מותאם)</option>
         </select>
-        ${isGuest ? `<input type="text" data-guestname="${i}" placeholder="שם האורח" value="${guestName}" style="margin-top:6px;font-size:13px;padding:6px 8px;">` : ''}
+        ${isGuest ? `<input type="text" data-guestname="${i}" placeholder="שם האורח" value="${escHtml(guestName)}" style="margin-top:6px;font-size:13px;padding:6px 8px;">` : ''}
         ${(!isLockMode && (allowSuggest || (person && !isGuest))) ? `<div class="panel-actions-row">
           ${allowSuggest ? `<button type="button" class="btn btn-outline btn-sm btn-suggest" data-suggest="${i}" title="הצע מתפלל מתאים אחר לפי תור ההוגנות">${assignedId ? '🔄 החלף באחר' : '✨ הצע מתפלל'}</button>` : ''}
           ${(person && !isGuest) ? (()=>{
@@ -2288,11 +2448,7 @@ function renderAssignTab(){
         sel.onchange = ()=>{
           const num = sel.dataset.aliyah;
           const val = sel.value;
-          if(val==='guest') STATE.current.assign[num] = 'guest:';
-          else if(val) STATE.current.assign[num] = val;
-          else delete STATE.current.assign[num];
-          if(STATE.current.waSent) delete STATE.current.waSent[num];
-          saveCurrent();
+          updateDraftSlotAssignment(num, val==='guest' ? 'guest:' : val);
           render();
         };
       });
@@ -2367,7 +2523,7 @@ function renderRecentTab(){
   intro.innerHTML = `<h2>ארכיון עליות</h2>
     <div class="note">כל השבתות שאושרו, מהחדשה לישנה. לחיצה על שבת פותחת את פרטי השיבוץ שלה, ולחיצה נוספת סוגרת בחזרה — כדי שהעמוד לא יהיה עמוס. לעריכה, יש ללחוץ "✏️ עריכת שיבוץ" בתוך הבלוק הפתוח (מיועד לתיקון טעויות או שינוי של הרגע האחרון, לא לשינויים שגרתיים).</div>
     <div class="row-flex" style="margin-top:12px;">
-      <div><label>חיפוש (פרשה או תאריך)</label><input type="text" id="recentSearchInput" placeholder="למשל: ואתחנן, או 20/07" value="${STATE.recentSearch||''}"></div>
+      <div><label>חיפוש (פרשה או תאריך)</label><input type="text" id="recentSearchInput" placeholder="למשל: ואתחנן, או 20/07" value="${escHtml(STATE.recentSearch||'')}"></div>
     </div>
     <div style="margin-top:12px;"><button class="btn btn-outline btn-sm" id="addManualWeekBtn">+ הוסף שבת עבר ידנית</button></div>
     <div class="note">שימושי כדי להזין שבתות שכבר התקיימו לפני שהתחלת להשתמש באתר — כך שהסבב ההוגן ייקח אותן בחשבון קדימה.</div>`;
@@ -2567,7 +2723,7 @@ function renderPeopleTab(){
     <div class="note">ייבוא CSV: שורת כותרת ואז שם,טווח פסוקים,טלפון בכל שורה ("חזק" בעמודת הטווח מסמן קורא חזק). מתפלל עם שם זהה לקיים יתעדכן, שם חדש יתווסף.</div>
     ${spreadHtml}
     <div class="row-flex" style="margin-top:14px;">
-      <div><label>חיפוש</label><input type="text" id="peopleSearchInput" placeholder="חיפוש לפי שם" value="${query}"></div>
+      <div><label>חיפוש</label><input type="text" id="peopleSearchInput" placeholder="חיפוש לפי שם" value="${escHtml(query)}"></div>
     </div>
     <div class="row-flex" style="margin-top:8px;align-items:center;">
       <label style="margin:0;">מיון:</label>
@@ -2677,8 +2833,8 @@ function renderPeopleTab(){
     });
     wrap.querySelectorAll('[data-del]').forEach(b=> b.onclick = ()=>{
       askConfirm('למחוק את המתפלל? הפעולה אינה הפיכה.', ()=>{
-        STATE.congregants = STATE.congregants.filter(c=>c.id!==b.dataset.del);
-        saveCongregants(); render();
+        deleteCongregantById(b.dataset.del);
+        render();
       });
     });
   },0);
@@ -2692,7 +2848,7 @@ function renderCongregantModal(){
   backdrop.innerHTML = `
     <div class="modal">
       <h3>${isNew?'הוספת מתפלל':'עריכת מתפלל'}</h3>
-      <div class="field"><label>שם מלא</label><input type="text" id="f-name" value="${person.name}"></div>
+      <div class="field"><label>שם מלא</label><input type="text" id="f-name" value="${escHtml(person.name)}"></div>
       <div class="field">
         <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
           <input type="checkbox" id="f-unrestricted" style="width:auto;" ${person.unrestricted?'checked':''}>
@@ -2706,7 +2862,7 @@ function renderCongregantModal(){
       </div>
       <div class="field">
         <label>מספר טלפון (רשות - לשליחת וואטסאפ)</label>
-        <input type="text" id="f-phone" value="${person.phone||''}" placeholder="050-1234567" dir="ltr" style="text-align:left;">
+        <input type="text" id="f-phone" value="${escHtml(person.phone||'')}" placeholder="050-1234567" dir="ltr" style="text-align:left;">
         <button type="button" class="btn btn-outline btn-sm" id="pickContactBtn" style="margin-top:8px;width:100%;">📇 בחר מאנשי קשר</button>
       </div>
       ${isNew ? `
@@ -2757,7 +2913,8 @@ function renderCongregantModal(){
     backdrop.querySelector('#saveModal').onclick = ()=>{
       const name = document.getElementById('f-name').value.trim();
       const unrestricted = document.getElementById('f-unrestricted').checked;
-      const level = unrestricted ? 100 : (parseInt(document.getElementById('f-level').value)||20);
+      const parsedLvl = parseInt(document.getElementById('f-level').value, 10);
+      const level = unrestricted ? 100 : Math.max(3, (isNaN(parsedLvl) || parsedLvl <= 0) ? 20 : parsedLvl);
       const phone = document.getElementById('f-phone').value.trim();
       if(!name){ notice('יש להזין שם'); return; }
       if(isNew){
@@ -2929,7 +3086,7 @@ function renderParashotTab(){
   waCard.innerHTML = `
     <h2>תבנית הודעת וואטסאפ</h2>
     <div class="note">הטקסט שנשלח כשלוחצים על "📱 שלח לו". אפשר להשתמש בארבע התוויות האלה, והן יוחלפו אוטומטית: <b>{שם}</b>, <b>{עלייה}</b>, <b>{פרשה}</b>, <b>{סרטון}</b> (קישור חיפוש ביוטיוב לקריאה של ניר גהלי בנוסח שאמי, לפרשה ולעלייה הספציפיות).</div>
-    <textarea id="wa-template" rows="3" style="width:100%;margin-top:8px;padding:10px 12px;border-radius:9px;border:1.5px solid var(--line);font-family:'Assistant',sans-serif;font-size:14px;">${STATE.whatsappTemplate || DEFAULT_WHATSAPP_TEMPLATE}</textarea>
+    <textarea id="wa-template" rows="3" style="width:100%;margin-top:8px;padding:10px 12px;border-radius:9px;border:1.5px solid var(--line);font-family:'Assistant',sans-serif;font-size:14px;">${escHtml(STATE.whatsappTemplate || DEFAULT_WHATSAPP_TEMPLATE)}</textarea>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-gold btn-sm" id="saveWaTemplate">שמירה</button>
       <button class="btn btn-outline btn-sm" id="resetWaTemplate">איפוס לברירת המחדל</button>
@@ -2964,10 +3121,13 @@ function renderParashotTab(){
   setTimeout(()=>{
     wrap.querySelectorAll('[data-editp]').forEach(b=> b.onclick=()=>{ STATE.editingParasha=b.dataset.editp; render(); });
     document.getElementById('saveMatchSettings').onclick = ()=>{
-      const lower = parseInt(document.getElementById('ms-lower').value)||80;
-      const upper = parseInt(document.getElementById('ms-upper').value)||110;
-      const strongMin = parseInt(document.getElementById('ms-strongmin').value);
-      STATE.matchSettings = {lower, upper, strongMin: isNaN(strongMin) ? 30 : strongMin};
+      const rawLo = parseInt(document.getElementById('ms-lower').value, 10) || 65;
+      const rawHi = parseInt(document.getElementById('ms-upper').value, 10) || 130;
+      const lower = Math.max(10, Math.min(100, Math.min(rawLo, rawHi)));
+      const upper = Math.max(lower + 5, Math.min(300, Math.max(rawLo, rawHi)));
+      const rawStrong = parseInt(document.getElementById('ms-strongmin').value, 10);
+      const strongMin = isNaN(rawStrong) ? 30 : Math.max(3, Math.min(200, rawStrong));
+      STATE.matchSettings = {lower, upper, strongMin};
       saveMatchSettings();
       render();
     };
@@ -3107,7 +3267,8 @@ function renderFairnessTab(){
     upperSlider.onchange = ()=>{ STATE.fairnessSimUpper = +upperSlider.value; render(); };
     const applyBtn = document.getElementById('applySimBtn');
     if(applyBtn) applyBtn.onclick = ()=>{
-      STATE.matchSettings = {lower:lower0, upper:upper0};
+      const prevStrongMin = (STATE.matchSettings && STATE.matchSettings.strongMin != null) ? STATE.matchSettings.strongMin : 30;
+      STATE.matchSettings = {lower:lower0, upper:upper0, strongMin:prevStrongMin};
       saveMatchSettings();
       STATE.fairnessSimLower = null;
       STATE.fairnessSimUpper = null;
@@ -3224,9 +3385,7 @@ function renderQueueTab(){
         if(!STATE.current) return;
         const pid = btn.dataset.quickassignPerson;
         const aliyahNum = btn.dataset.quickassignAliyah;
-        STATE.current.assign[aliyahNum] = pid;
-        if(STATE.current.unfilledReasons) delete STATE.current.unfilledReasons[aliyahNum];
-        saveCurrent();
+        updateDraftSlotAssignment(aliyahNum, pid);
         render();
         notice(`שובץ בהצלחה לעלייה ${ALIYAH_NAMES[parseInt(aliyahNum,10)-1]}!`);
       };
@@ -3257,7 +3416,10 @@ function renderParashaModal(){
     backdrop.querySelector('#saveP').onclick = ()=>{
       const inputs = backdrop.querySelectorAll('input[data-idx]');
       const arr = new Array(7).fill(3);
-      inputs.forEach(inp=>{ arr[parseInt(inp.dataset.idx)] = parseInt(inp.value)||3; });
+      inputs.forEach(inp=>{
+        const v = parseInt(inp.value, 10);
+        arr[parseInt(inp.dataset.idx, 10)] = Math.max(3, (isNaN(v) || v <= 0) ? 3 : v);
+      });
       const baseline = getBaselineSplit(name);
       if(arraysEqual(arr, baseline)){
         // matches the verified/estimated baseline again - drop the override entirely
