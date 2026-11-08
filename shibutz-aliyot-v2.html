@@ -406,20 +406,28 @@ const PARASHOT_DEFAULT_TOTALS = [
 // neighbors.
 const PARASHA_ORDER = PARASHOT_DEFAULT_TOTALS.map(p=>p[0]);
 const PARASHA_CYCLE_LEN = 54; // the 54 regular (non-combined) parashot, in order, before it repeats
-const PARASHA_COMBINED_ALIAS = {
+const PARASHA_COMBINED_FIRST_ALIAS = {
   "ויקהל-פקודי":"ויקהל", "תזריע-מצורע":"תזריע", "אחרי מות-קדושים":"אחרי מות",
   "בהר-בחוקותי":"בהר", "מטות-מסעי":"מטות", "נצבים-וילך":"נצבים"
 };
-function parashaOrderIndex(name){
-  const key = PARASHA_COMBINED_ALIAS[name] || name;
+const PARASHA_COMBINED_LAST_ALIAS = {
+  "ויקהל-פקודי":"פקודי", "תזריע-מצורע":"מצורע", "אחרי מות-קדושים":"קדושים",
+  "בהר-בחוקותי":"בחוקותי", "מטות-מסעי":"מסעי", "נצבים-וילך":"וילך"
+};
+function parashaOrderIndex(name, useEndOfPair){
+  const aliasMap = useEndOfPair ? PARASHA_COMBINED_LAST_ALIAS : PARASHA_COMBINED_FIRST_ALIAS;
+  const key = aliasMap[name] || name;
   const idx = PARASHA_ORDER.indexOf(key);
   return idx===-1 ? null : idx;
 }
 // Circular distance from an earlier parasha to a later one along the yearly cycle - 1 means "the
 // parasha immediately before this one" (read it last week), large numbers mean a long time ago,
 // including a full year back (which correctly comes out near PARASHA_CYCLE_LEN, not 0).
+// When measuring FROM a combined double parasha (e.g. "ויקהל-פקודי") TO the next week ("ויקרא"),
+// we measure from the second parasha of the pair ("פקודי") to the first of the target, so the
+// immediate next Shabbat correctly computes a gap of 1 instead of 2.
 function parashaGap(fromName, toName){
-  const a = parashaOrderIndex(fromName), b = parashaOrderIndex(toName);
+  const a = parashaOrderIndex(fromName, true), b = parashaOrderIndex(toName, false);
   if(a===null || b===null) return Infinity; // unrecognized name - never block on unknown data
   let diff = (b - a + PARASHA_CYCLE_LEN) % PARASHA_CYCLE_LEN;
   if(diff===0) diff = PARASHA_CYCLE_LEN;
@@ -925,16 +933,17 @@ function aggregateStatsFromLog(logEntries){
   for(const c of STATE.congregants){
     map[c.id] = { entries: [], base: c.baseTotal||0 };
   }
-  for(const w of logEntries){
+  for(let logIdx=0; logIdx<logEntries.length; logIdx++){
+    const w = logEntries[logIdx];
     for(const k of Object.keys(w.assign||{})){
       const id = w.assign[k];
-      if(map[id]) map[id].entries.push({date:w.date, parasha:w.parasha, aliyah:parseInt(k), weekId:w.id});
+      if(map[id]) map[id].entries.push({date:w.date, parasha:w.parasha, aliyah:parseInt(k), weekId:w.id, logIdx});
     }
   }
   const result = {};
   for(const id in map){
     const { entries, base } = map[id];
-    entries.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    entries.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.logIdx - b.logIdx));
     result[id] = {
       total: base + entries.length,
       lastEntry: entries.length ? entries[entries.length-1] : null,
@@ -1078,11 +1087,23 @@ function computeFlexibilityScore(lowerPct, upperPct){
   return totalSlots ? totalFits/totalSlots : 0;
 }
 
-function fairnessCompare(a, b){
+function fairnessCompare(a, b, parashaName){
   const sa = getCongStats(a.id), sb = getCongStats(b.id);
   if(sa.total !== sb.total) return sa.total - sb.total;
   const aNever = sa.lastEntry ? 1:0, bNever = sb.lastEntry ? 1:0;
   if(aNever !== bNever) return aNever - bNever;
+  // Tiebreaker for equal totals: whoever read longer ago (larger parasha gap, or older date) comes first
+  if(parashaName && sa.lastEntry && sb.lastEntry){
+    const gapA = parashaGapSinceLastRead(sa, parashaName);
+    const gapB = parashaGapSinceLastRead(sb, parashaName);
+    if(gapA !== gapB) return gapB - gapA;
+  }
+  const dateA = (sa.lastEntry && sa.lastEntry.date) || '';
+  const dateB = (sb.lastEntry && sb.lastEntry.date) || '';
+  if(dateA !== dateB) return dateA.localeCompare(dateB);
+  const idxA = (sa.lastEntry && sa.lastEntry.logIdx!=null) ? sa.lastEntry.logIdx : -1;
+  const idxB = (sb.lastEntry && sb.lastEntry.logIdx!=null) ? sb.lastEntry.logIdx : -1;
+  if(idxA !== idxB) return idxA - idxB;
   return Math.random() - 0.5;
 }
 // Same ordering as fairnessCompare, but with a deterministic (alphabetical) tiebreak instead of
@@ -1091,11 +1112,22 @@ function fairnessCompare(a, b){
 // on purpose (see fairnessCompare) - this never touches an actual assignment, display only.
 // Takes an explicit statsMap so a past week can be sorted by the totals as they stood back then
 // (see buildStatsMapAsOf), not by today's totals.
-function fairnessCompareStable(a, b, statsMap){
+function fairnessCompareStable(a, b, statsMap, parashaName){
   const sa = statsMap[a.id] || {total:0, lastEntry:null}, sb = statsMap[b.id] || {total:0, lastEntry:null};
   if(sa.total !== sb.total) return sa.total - sb.total;
   const aNever = sa.lastEntry ? 1:0, bNever = sb.lastEntry ? 1:0;
   if(aNever !== bNever) return aNever - bNever;
+  if(parashaName && sa.lastEntry && sb.lastEntry){
+    const gapA = parashaGapSinceLastRead(sa, parashaName);
+    const gapB = parashaGapSinceLastRead(sb, parashaName);
+    if(gapA !== gapB) return gapB - gapA;
+  }
+  const dateA = (sa.lastEntry && sa.lastEntry.date) || '';
+  const dateB = (sb.lastEntry && sb.lastEntry.date) || '';
+  if(dateA !== dateB) return dateA.localeCompare(dateB);
+  const idxA = (sa.lastEntry && sa.lastEntry.logIdx!=null) ? sa.lastEntry.logIdx : -1;
+  const idxB = (sb.lastEntry && sb.lastEntry.logIdx!=null) ? sb.lastEntry.logIdx : -1;
+  if(idxA !== idxB) return idxA - idxB;
   return a.name.localeCompare(b.name, 'he');
 }
 // Explains, for one normal congregant, exactly why a given week's assign object does or doesn't
@@ -1125,10 +1157,9 @@ function explainQueuePerson(person, weekEntry, split, statsMap){
     return {selected:false, reason:`קרא בפרשת ${lastParasha} - הפרשה הקודמת - כלל הברזל אוסר לשבץ שוב שבוע אחרי שבוע.`};
   }
   if(person.unrestricted){
-    // strong readers have no pasuk range, so "not selected" never means a fit problem - it means
-    // every aliyah that reached the strong-reader fallback this week (see runAssignment) was
-    // already claimed by another strong reader earlier in their own fairness order, or normal
-    // readers simply covered all 7 aliyot themselves and no fallback was ever needed.
+    // Strong readers compete directly on the largest aliyot of the parasha and step in as fallback
+    // on any remaining open aliyot. If a strong reader wasn't selected, explain who took the big
+    // aliyot / strong-reader slots ahead of them in the fairness queue.
     const strongWinners = [];
     for(let i=1;i<=7;i++){
       const id = assign[i]||assign[String(i)];
@@ -1137,8 +1168,8 @@ function explainQueuePerson(person, weekEntry, split, statsMap){
       if(p && p.unrestricted) strongWinners.push(p.name);
     }
     return strongWinners.length===0
-      ? {selected:false, reason:'כל שבע העליות שובצו למתפללים רגילים בשבת הזו — לא נותרה עלייה לקוראים חזקים.'}
-      : {selected:false, reason:`העלייה שנותרה לקוראים חזקים בשבת הזו ניתנה ל${strongWinners.join(', ')}, שקודם/קודמים לו בתור הקוראים החזקים.`};
+      ? {selected:false, reason:'כל שבע העליות (כולל העליות הגדולות) שובצו למתפללים רגילים שקדמו לו בתור ההוגנות בשבת הזו.'}
+      : {selected:false, reason:`העליות הגדולות בשבת הזו ניתנו ל${strongWinners.join(', ')}, שקודם/קודמים לו בתור ההוגנות.`};
   }
   if((weekEntry.deferred||[]).includes(person.id)){
     return {selected:false, reason:'אין עלייה שמתאימה לטווח היכולת שלו בשבת הזו.'};
@@ -1181,8 +1212,9 @@ function runAssignment(parashaName, date, locks){
   // Iron rule: reading last week makes someone entirely ineligible this week, no exceptions -
   // filtered out of both pools before anything else runs. Locked people (explicit manual
   // overrides, e.g. a bar mitzvah) are a deliberate exception to everything, recency included.
-  const strongPool = STATE.congregants.filter(c=>c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName)).sort(fairnessCompare);
-  const normalPool = STATE.congregants.filter(c=>!c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName)).sort(fairnessCompare);
+  const cmpForParasha = (a,b) => fairnessCompare(a, b, parashaName);
+  const strongPool = STATE.congregants.filter(c=>c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName)).sort(cmpForParasha);
+  const normalPool = STATE.congregants.filter(c=>!c.unrestricted && !c.paused && !lockedCongIds.has(c.id) && !isRecencyBlocked(getCongStats(c.id), parashaName)).sort(cmpForParasha);
   const recentlyExcluded = STATE.congregants
     .filter(c=>!c.paused && !lockedCongIds.has(c.id) && isRecencyBlocked(getCongStats(c.id), parashaName))
     .map(c=>c.id);
@@ -1197,81 +1229,159 @@ function runAssignment(parashaName, date, locks){
   // The hardest aliyah any normal (banded) reader in the community could ever be given - used to
   // tell "too hard for anyone normal, a strong reader is genuinely needed" apart from "just
   // happens to be too short/awkward for whoever's available right now, gabbai should decide".
-  // Deliberately computed from the FULL roster, not normalPool - normalPool is filtered down by
-  // this week's locks and the recency rule, so using it here would make the "ceiling" shrink
-  // whenever enough higher-level readers happen to be excluded this week, mislabeling an
-  // perfectly ordinary aliyah as "exceeds everyone's ability" when it only exceeds who's
-  // available right now.
   const upperPct = (STATE.matchSettings && STATE.matchSettings.upper) || 110;
   const allNormalLevels = STATE.congregants.filter(c=>!c.unrestricted && !c.paused).map(c=>c.level);
   const maxNormalCeiling = allNormalLevels.length ? Math.max(...allNormalLevels.map(lvl=>lvl*(upperPct/100))) : 0;
 
-  // Going hardest aliyah first: give it to a normal (banded) reader if some normal reader's band
-  // actually reaches it. Strong readers are full participants in the rotation, not a rare
-  // emergency valve - but they have a soft preferred floor (matchSettings.strongMin, default 30
-  // pesukim) so a due strong reader doesn't routinely end up with whatever tiny aliyah nobody
-  // else wanted. Phase 1 (here): a strong reader only steps in for an aliyah at/above that floor.
-  // Phase 2 (below): only strong readers still unused after phase 1 get matched to whatever's
-  // left, largest-first - so the floor is a genuine preference that degrades gracefully, not a
-  // hard wall that leaves them unassigned on a week with nothing long.
+  // Strong readers are equal participants in the community rotation (should accumulate the same
+  // number of aliyot over time as everyone else), while being steered toward the largest aliyot.
+  // An aliyah is considered a "big aliyah" eligible for direct head-to-head competition between
+  // strong and normal readers if it is >= strongMinPesukim (default 30) OR is among the top 2
+  // longest aliyot of this week's parasha (so in shorter parashot where the longest aliyah is e.g.
+  // 22 pesukim, due strong readers still get their fair turn on the biggest reading of the week).
   const strongMinPesukim = (STATE.matchSettings && STATE.matchSettings.strongMin) || 30;
+  const sortedPesukimDesc = split.slice().sort((a,b)=>b-a);
+  const topTwoThreshold = sortedPesukimDesc[Math.min(1, sortedPesukimDesc.length-1)] || 0;
+  const isBigAliyahForStrong = (pesukim) => pesukim >= strongMinPesukim || pesukim >= topTwoThreshold;
+
+  // Backtracking / augmenting-path helper: if `aliyah` cannot be filled directly by any unused
+  // normal reader, check if an ALREADY-assigned normal reader `u` (currently holding `uAliyahNum`)
+  // also fits `aliyah`, AND some unused normal reader `v` (in fairness order) fits `uAliyahNum`.
+  // Moving `u` to `aliyah` and giving `uAliyahNum` to `v` fills BOTH aliyot without dropping anyone
+  // who was already selected!
+  function tryAugmentNormal(aliyah){
+    const assignedNums = Object.keys(assign)
+      .map(k=>parseInt(k,10))
+      .filter(num => !locks[num] && assign[num] && !String(assign[num]).startsWith('guest:'));
+    for(const tierAllowRecent of [false, true]){
+      for(const uNum of assignedNums){
+        const uId = assign[uNum];
+        const uPerson = resolvePerson(uId);
+        if(!uPerson || uPerson.unrestricted) continue;
+        if(!fits(uPerson, aliyah.pesukim)) continue;
+        const uPesukim = split[uNum - 1];
+        const vCandidate = normalPool.find(v =>
+          !usedNormal.has(v.id) &&
+          fits(v, uPesukim) &&
+          (tierAllowRecent || !isRecencyWarning(getCongStats(v.id), parashaName))
+        );
+        if(vCandidate){
+          assign[aliyah.aliyahNum] = uPerson.id;
+          assign[uNum] = vCandidate.id;
+          usedNormal.add(vCandidate.id);
+          if(isRecencyWarning(getCongStats(vCandidate.id), parashaName)){
+            recentGapPeople.add(vCandidate.id);
+          }
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   const stillOpen = [];
   for(const aliyah of remaining){
     const normalFound = findFairCandidate(normalPool, usedNormal, p=>fits(p, aliyah.pesukim), parashaName);
+    const canCompeteStrong = isBigAliyahForStrong(aliyah.pesukim);
+    const strongFound = canCompeteStrong ? findFairCandidate(strongPool, usedStrong, ()=>true, parashaName) : null;
+
+    if(normalFound && strongFound){
+      // Both a normal reader and a strong reader are available for this big aliyah.
+      // Because strong readers are equal participants in the rotation AND their specialty is
+      // taking the largest aliyot of the parasha, a strong reader who is near or ahead of the
+      // normal candidate in fairness order (within +1 read of the normal candidate) claims the
+      // big aliyah directly - so the normal reader can instead take one of the medium aliyot that
+      // follow, rather than forcing the strong reader down into a tiny leftover aliyah in Phase 2.
+      let pickStrong = false;
+      if(normalFound.recentGap !== strongFound.recentGap){
+        pickStrong = !strongFound.recentGap;
+      } else {
+        const sNorm = getCongStats(normalFound.person.id);
+        const sStr = getCongStats(strongFound.person.id);
+        if(sStr.total <= sNorm.total + 1){
+          pickStrong = true;
+        }
+      }
+      if(pickStrong){
+        assign[aliyah.aliyahNum] = strongFound.person.id;
+        usedStrong.add(strongFound.person.id);
+        if(strongFound.recentGap) recentGapPeople.add(strongFound.person.id);
+        continue;
+      } else {
+        assign[aliyah.aliyahNum] = normalFound.person.id;
+        usedNormal.add(normalFound.person.id);
+        if(normalFound.recentGap) recentGapPeople.add(normalFound.person.id);
+        continue;
+      }
+    }
+
     if(normalFound){
       assign[aliyah.aliyahNum] = normalFound.person.id;
       usedNormal.add(normalFound.person.id);
       if(normalFound.recentGap) recentGapPeople.add(normalFound.person.id);
       continue;
     }
-    if(aliyah.pesukim >= strongMinPesukim){
-      const strongFound = findFairCandidate(strongPool, usedStrong, ()=>true, parashaName);
-      if(strongFound){
-        assign[aliyah.aliyahNum] = strongFound.person.id;
-        usedStrong.add(strongFound.person.id);
-        if(strongFound.recentGap) recentGapPeople.add(strongFound.person.id);
-        continue;
-      }
+
+    // No unused normal reader directly fits this aliyah - try a 1-step augmenting swap before
+    // falling back to a strong reader or leaving it open.
+    if(tryAugmentNormal(aliyah)){
+      continue;
+    }
+
+    if(strongFound){
+      assign[aliyah.aliyahNum] = strongFound.person.id;
+      usedStrong.add(strongFound.person.id);
+      if(strongFound.recentGap) recentGapPeople.add(strongFound.person.id);
+      continue;
     }
     stillOpen.push(aliyah); // either below the strong-reader floor, or no strong reader free (yet)
   }
 
-  // Phase 2: any strong reader still unused gets the largest remaining open aliyah, even if it's
-  // below the preferred floor - degrading gradually instead of jumping straight to "unassigned".
+  // Phase 2: any strong reader still unused gets the largest remaining open aliyah, UNLESS the
+  // open aliyah is a tiny reading (< 10 pesukim) AND the strong reader is already ahead of the
+  // community average (so strong readers aren't repeatedly burned on 4-7 pasuk aliyot every week,
+  // keeping them fresh for the big 30+ pasuk aliyot in Phase 1).
   stillOpen.sort((a,b)=> b.pesukim - a.pesukim);
   const trulyUnfilled = [];
+  const activeTotals = STATE.congregants.filter(c=>!c.paused).map(c=>getCongStats(c.id).total);
+  const communityAvgTotal = activeTotals.length ? activeTotals.reduce((a,b)=>a+b,0)/activeTotals.length : 0;
   for(const aliyah of stillOpen){
-    const strongFound = findFairCandidate(strongPool, usedStrong, ()=>true, parashaName);
+    const strongFound = findFairCandidate(
+      strongPool,
+      usedStrong,
+      s => aliyah.pesukim >= 10 || getCongStats(s.id).total <= communityAvgTotal,
+      parashaName
+    );
     if(strongFound){
       assign[aliyah.aliyahNum] = strongFound.person.id;
       usedStrong.add(strongFound.person.id);
       if(strongFound.recentGap) recentGapPeople.add(strongFound.person.id);
     } else {
-      trulyUnfilled.push(aliyah); // no strong readers left either - genuinely needs a human
+      trulyUnfilled.push(aliyah); // no eligible strong readers left either - genuinely needs a human
     }
   }
 
   // ---------- local-fit optimization pass ----------
-  // The greedy hardest-first loop above guarantees everyone picked is a valid fit and that WHO
-  // gets picked always respects fairness order - but processing order can still leave two
-  // people's aliyot "crossed" (e.g. a higher-level reader stuck with the smaller of two aliyot
-  // while a lower-level reader holds the larger one), or a strong reader parked on the smallest
-  // aliyah in the parasha just because it was the only one still open when their turn came - even
-  // though swapping them would fit each of them better and breaks no rule at all. This pass only
-  // ever swaps aliyot BETWEEN two people already selected this week, so it never changes WHO is
-  // used - fairness/queue order for future weeks is completely unaffected, only how well the SIZE
-  // of what they got matches them. A normal reader's target is their own level (roughly the
-  // center of their allowed band); a strong reader's target is the largest aliyah in the parasha,
-  // since the whole point of treating them as full participants is that they take on the biggest
-  // reading available, not whatever was left over by the time normal readers finished picking.
+  // 1) Strong-reader promotion with replacement: if a strong reader ended up on a tiny fallback
+  //    aliyah (e.g. 6 pesukim because no normal reader fits 6), a direct swap with a normal reader
+  //    on a big aliyah (e.g. 28 pesukim) is blocked because the normal reader doesn't fit 6.
+  //    However, if that normal reader on 28 has already read MORE (or equal) times than the strong
+  //    reader, AND wait - we don't want to drop a selected person, OR if there's an even larger
+  //    aliyah where the normal reader can move to another open slot, we move them!
   const maxPesukimThisWeek = Math.max(...split);
-  const misfit = (person, pesukim) => person.unrestricted ? (maxPesukimThisWeek - pesukim) : Math.abs(pesukim - person.level);
+  const misfit = (person, pesukim) => person.unrestricted ? (maxPesukimThisWeek - pesukim) * 2.5 : Math.abs(pesukim - person.level);
   const swappableAliyot = Object.keys(assign)
     .map(k=>parseInt(k,10))
     .filter(num => !locks[num] && assign[num] && !String(assign[num]).startsWith('guest:'));
+
+  // 3-way cycle swaps (A -> B -> C -> A) in addition to 2-way swaps (A <-> B):
+  // Allows a strong reader on a small aliyah (e.g. 11) to take a large aliyah (e.g. 28 from a
+  // level-25 reader), while the level-25 reader moves to a medium aliyah (e.g. 17 from a level-15
+  // reader), and the level-15 reader moves to the 11-pesukim aliyah!
   let improved = true, guard = 0;
-  while(improved && guard++ < 30){
+  while(improved && guard++ < 40){
     improved = false;
+    // 2-way swaps
     for(let i=0;i<swappableAliyot.length;i++){
       for(let j=i+1;j<swappableAliyot.length;j++){
         const numA = swappableAliyot[i], numB = swappableAliyot[j];
@@ -1286,6 +1396,31 @@ function runAssignment(parashaName, date, locks){
           assign[numA] = personB.id;
           assign[numB] = personA.id;
           improved = true;
+        }
+      }
+    }
+    if(improved) continue;
+    // 3-way cycle swaps: personA->numB, personB->numC, personC->numA
+    for(let i=0;i<swappableAliyot.length && !improved;i++){
+      for(let j=0;j<swappableAliyot.length && !improved;j++){
+        if(j===i) continue;
+        for(let k=0;k<swappableAliyot.length && !improved;k++){
+          if(k===i || k===j) continue;
+          const numA = swappableAliyot[i], numB = swappableAliyot[j], numC = swappableAliyot[k];
+          const pA = resolvePerson(assign[numA]), pB = resolvePerson(assign[numB]), pC = resolvePerson(assign[numC]);
+          if(!pA || !pB || !pC) continue;
+          const pesA = split[numA-1], pesB = split[numB-1], pesC = split[numC-1];
+          if(!pA.unrestricted && !fits(pA, pesB)) continue;
+          if(!pB.unrestricted && !fits(pB, pesC)) continue;
+          if(!pC.unrestricted && !fits(pC, pesA)) continue;
+          const before = misfit(pA, pesA) + misfit(pB, pesB) + misfit(pC, pesC);
+          const after = misfit(pA, pesB) + misfit(pB, pesC) + misfit(pC, pesA);
+          if(after < before - 1e-9){
+            assign[numB] = pA.id;
+            assign[numC] = pB.id;
+            assign[numA] = pC.id;
+            improved = true;
+          }
         }
       }
     }
@@ -2686,7 +2821,8 @@ function renderQueueTab(){
 
   const current = STATE.current;
   const liveStats = buildStatsMap();
-  const queue = active.slice().sort((a,b)=>fairnessCompareStable(a,b, liveStats));
+  const refParasha = (current && current.parasha) || STATE.pendingParasha || (STATE.suggestedParasha && STATE.suggestedParasha.name) || null;
+  const queue = active.slice().sort((a,b)=>fairnessCompareStable(a,b, liveStats, refParasha));
   const split = current ? getSplit(current.parasha) : null;
 
   const introNote = current
