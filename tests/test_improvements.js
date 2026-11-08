@@ -141,4 +141,13 @@ console.log(`Avg aliyah size for Strong reader (excluding <10 pasuk orphans): ${
 assert(ironRuleViolations === 0, 'Expected 0 iron rule violations');
 assert(Math.abs(avgStrongReads - avgNormalReads) < 5, 'Expected strong and normal readers to have nearly equal average reads');
 assert(avgStrongNonTinyPesukim > avgNormalPesukim + 12, 'Expected strong readers to get significantly larger aliyot on average');
-console.log('✅ All 5 tests & 1,080-week simulation passed!');
+
+// 6. Test suggestReplacementForAliyah & locks preservation
+runAssignment('בראשית', '2026-10-10', {1: 'c1'});
+assert(STATE.current.locks && STATE.current.locks[1] === 'c1', 'Expected locks to be saved on STATE.current');
+const beforeAliyah2 = STATE.current.assign[2];
+suggestReplacementForAliyah(2);
+const afterAliyah2 = STATE.current.assign[2];
+assert(afterAliyah2 && afterAliyah2 !== beforeAliyah2, `Expected suggestReplacementForAliyah to change aliyah 2 from ${beforeAliyah2} to ${afterAliyah2}`);
+console.log('✅ Test 6 passed: suggestReplacementForAliyah and lock persistence work accurately.');
+console.log('✅ All 6 tests & 1,080-week simulation passed!');

@@ -16,99 +16,116 @@
 @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;500;600;700;800&display=swap');
 
 :root{
-  --bg:#F5EEDC;
+  --bg:#F4EBDC;
   --card:#FFFCF6;
-  --ink:#202A44;
-  --ink-soft:#5B6178;
-  --gold:#B8924F;
-  --gold-deep:#8F6B2E;
-  --claret:#7C3F34;
-  --claret-deep:#5E2E26;
-  --line:#E3D5AE;
+  --ink:#1D2742;
+  --ink-soft:#59607A;
+  --gold:#C29B56;
+  --gold-deep:#8C672A;
+  --gold-light:#F6ECDA;
+  --claret:#7E3E33;
+  --claret-deep:#582921;
+  --line:#E2D3AC;
   --warn:#9B4A3D;
-  --warn-bg:#F7E4DD;
-  --good:#4B6B3E;
-  --good-bg:#E8EEDC;
-  --radius:16px;
+  --warn-bg:#F8E5DF;
+  --good:#3E6B42;
+  --good-bg:#E6F0E4;
+  --radius:18px;
 }
 *{box-sizing:border-box;}
 html, body{ overflow-x:hidden; max-width:100vw; }
 body::before{
   content:'';
   position:fixed; top:0; left:0; right:0; height:5px; z-index:100;
-  background:repeating-linear-gradient(90deg, var(--gold) 0 24px, var(--claret) 24px 48px);
+  background:linear-gradient(90deg, var(--claret-deep), var(--gold), var(--claret), var(--gold-deep), var(--claret-deep));
+  box-shadow:0 1px 6px rgba(94,46,38,0.25);
 }
 body{
   margin:0;
   background:var(--bg);
   background-image:
-    radial-gradient(circle at 12% 0%, rgba(184,146,79,0.10), transparent 42%),
-    radial-gradient(circle at 92% 100%, rgba(124,63,52,0.07), transparent 42%);
+    radial-gradient(circle at 10% 0%, rgba(194,155,86,0.16), transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(126,62,51,0.09), transparent 45%),
+    radial-gradient(circle at 50% 40%, rgba(255,252,246,0.55), transparent 65%);
   color:var(--ink);
   font-family:'Assistant', sans-serif;
   direction:rtl;
   min-height:100vh;
-  padding:32px 16px 64px;
+  padding:28px 16px 72px;
 }
-.wrap{max-width:940px;margin:0 auto;}
+.wrap{max-width:980px;margin:0 auto;}
 
 header.top{
   display:flex; align-items:center; justify-content:space-between;
-  gap:16px; margin-bottom:14px; flex-wrap:wrap;
-  padding-bottom:18px;
-  border-bottom:1px solid var(--line);
+  gap:16px; margin-bottom:20px; flex-wrap:wrap;
+  padding:18px 22px;
+  background:linear-gradient(165deg, rgba(255,252,246,0.92), rgba(248,240,222,0.88));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 4px 20px -4px rgba(29,39,66,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
+  backdrop-filter:blur(8px);
 }
-.brand{display:flex; align-items:center; gap:14px;}
-.brand-mark{flex-shrink:0; filter:drop-shadow(0 3px 6px rgba(143,107,46,0.35));}
+.brand{display:flex; align-items:center; gap:15px;}
+.brand-mark{flex-shrink:0; filter:drop-shadow(0 4px 8px rgba(140,103,42,0.35)); transition:transform .25s ease;}
+.brand:hover .brand-mark{transform:scale(1.04) rotate(-2deg);}
 .eyebrow{
-  font-size:11.5px; font-weight:800; letter-spacing:1.2px; color:var(--gold-deep);
+  font-size:11.5px; font-weight:800; letter-spacing:1.3px; color:var(--gold-deep);
   text-transform:uppercase; margin-bottom:2px;
 }
 h1{
   font-family:'Frank Ruhl Libre', serif;
   font-weight:900;
-  font-size:27px;
+  font-size:28px;
   margin:0;
   letter-spacing:0.2px;
   color:var(--ink);
+  line-height:1.15;
 }
-.subtitle{font-size:13px;color:var(--ink-soft);margin-top:3px;letter-spacing:0.2px;}
+.subtitle{font-size:13.5px;color:var(--ink-soft);margin-top:3px;letter-spacing:0.15px;}
 
 nav.tabs{
-  display:flex; gap:4px; background:var(--card); flex-wrap:wrap;
-  border:1px solid var(--line); border-radius:12px; padding:5px;
-  box-shadow:0 2px 8px rgba(32,42,68,0.06);
+  display:flex; gap:4px; background:#F7EFE0; flex-wrap:wrap;
+  border:1px solid var(--line); border-radius:13px; padding:5px;
+  box-shadow:inset 0 1px 3px rgba(29,39,66,0.06);
 }
 nav.tabs button{
-  border:none;background:transparent;padding:9px 15px;border-radius:8px;
+  border:none;background:transparent;padding:9px 15px;border-radius:9px;
   font-family:'Assistant',sans-serif;font-weight:700;font-size:13.5px;
-  color:var(--ink-soft); cursor:pointer; transition:all .15s; white-space:nowrap;
+  color:var(--ink-soft); cursor:pointer; transition:all .18s ease; white-space:nowrap;
 }
-nav.tabs button.active{background:var(--ink);color:#FBF6E9;}
-nav.tabs button:hover:not(.active){background:rgba(32,42,68,0.06); color:var(--ink);}
+nav.tabs button.active{
+  background:linear-gradient(160deg, var(--ink), #2A385C);
+  color:#FBF6E9;
+  box-shadow:0 3px 10px rgba(29,39,66,0.22);
+}
+nav.tabs button:hover:not(.active){background:rgba(194,155,86,0.14); color:var(--ink);}
 
 .card{
   background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-  padding:24px; margin-bottom:20px; overflow-x:auto;
-  box-shadow:0 1px 2px rgba(32,42,68,0.04), 0 8px 20px -6px rgba(32,42,68,0.08);
+  padding:24px 26px; margin-bottom:20px; overflow-x:auto; position:relative;
+  box-shadow:0 2px 4px rgba(29,39,66,0.03), 0 10px 26px -8px rgba(29,39,66,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 .card h2{
-  font-family:'Frank Ruhl Libre',serif; font-weight:700; font-size:19.5px; margin:0 0 14px;
+  font-family:'Frank Ruhl Libre',serif; font-weight:700; font-size:20.5px; margin:0 0 14px;
   display:flex;align-items:center;gap:8px;justify-content:space-between;
   color:var(--ink);
 }
+.card-sub{font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin-bottom:10px;}
 label{font-size:13px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px;letter-spacing:0.1px;}
 select, input[type=text], input[type=number], input[type=date]{
-  width:100%; padding:10px 12px; border-radius:9px; border:1.5px solid var(--line);
+  width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line);
   font-family:'Assistant',sans-serif; font-size:15px; background:#fff; color:var(--ink);
-  transition:border-color .15s;
+  transition:border-color .15s, box-shadow .15s;
 }
-select:focus, input:focus{outline:none;border-color:var(--gold);}
+select:focus, input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(194,155,86,0.18);}
+optgroup{font-weight:800; color:var(--ink); background:#FAF5E8; font-family:'Assistant',sans-serif;}
+option{font-weight:600; color:var(--ink); background:#fff; padding:4px;}
 
 .date-pill{
-  padding:10px 12px;border-radius:9px;border:1.5px solid var(--line);
-  background:linear-gradient(180deg,#F1E7CC,#E9DBB6);
+  padding:10px 14px;border-radius:10px;border:1.5px solid var(--line);
+  background:linear-gradient(180deg,#F5ECD4,#EADBB6);
   font-weight:800; color:var(--gold-deep); text-align:center; letter-spacing:0.2px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.7);
 }
 
 .row-flex{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;}
@@ -116,49 +133,73 @@ select:focus, input:focus{outline:none;border-color:var(--gold);}
 
 .btn{
   border:none; border-radius:10px; padding:11px 22px; font-weight:800; font-size:15px;
-  cursor:pointer; font-family:'Assistant',sans-serif; transition:transform .1s, box-shadow .15s, background .15s;
+  cursor:pointer; font-family:'Assistant',sans-serif; transition:transform .12s, box-shadow .15s, background .15s, border-color .15s;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none;
 }
 .btn:active{transform:scale(0.97);}
 .btn-gold{background:linear-gradient(160deg,var(--gold),var(--gold-deep));color:#fff;
-  box-shadow:0 3px 10px rgba(143,107,46,0.35);}
-.btn-gold:hover{box-shadow:0 6px 16px rgba(143,107,46,0.45); transform:translateY(-1px);}
-.btn-start{font-size:18px;padding:15px 42px;letter-spacing:1.5px;}
-.btn-ink{background:var(--ink);color:#FBF6E9;}
-.btn-ink:hover{background:#2A3555;}
-.btn-outline{background:transparent;border:1.5px solid var(--line);color:var(--ink);}
-.btn-outline:hover{border-color:var(--gold); color:var(--gold-deep);}
+  box-shadow:0 3px 10px rgba(140,103,42,0.35), inset 0 1px 0 rgba(255,255,255,0.25);}
+.btn-gold:hover{box-shadow:0 6px 18px rgba(140,103,42,0.45); transform:translateY(-1px);}
+.btn-start{font-size:17px;padding:13px 36px;letter-spacing:0.8px;}
+.btn-ink{background:linear-gradient(160deg, var(--ink), #2B395E);color:#FBF6E9;box-shadow:0 3px 10px rgba(29,39,66,0.25);}
+.btn-ink:hover{background:linear-gradient(160deg, #273456, #33436E);transform:translateY(-1px);}
+.btn-outline{background:#FFFEFA;border:1.5px solid var(--line);color:var(--ink);}
+.btn-outline:hover{border-color:var(--gold); color:var(--gold-deep); background:#FBF6EA;}
 .btn-danger{background:transparent;color:var(--warn);border:1.5px solid var(--warn-bg);}
 .btn-danger:hover{background:var(--warn-bg);}
-.btn-sm{padding:6px 12px;font-size:13px;border-radius:7px;}
+.btn-sm{padding:6px 12px;font-size:12.5px;border-radius:8px;}
+.btn-wa-sent{background:var(--good-bg); border:1.5px solid #B7D3B0; color:var(--good);}
+.btn-wa-sent:hover{background:#DAE9D6; border-color:var(--good);}
 
 .center{text-align:center;}
 
 .week-strip{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
-  gap:12px; margin:18px 0;
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(205px, 1fr));
+  gap:14px; margin:18px 0;
 }
 .panel{
-  background:var(--card); border:1px solid var(--line);
-  border-radius:12px; padding:16px 12px 14px; text-align:center; position:relative;
-  transition:box-shadow .15s;
+  background:linear-gradient(180deg, #FFFEFB 0%, #FAF4E6 100%);
+  border:1.5px solid var(--line);
+  border-radius:14px; padding:18px 13px 15px; text-align:center; position:relative;
+  transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  display:flex; flex-direction:column; align-items:stretch;
 }
-.panel:hover{box-shadow:0 4px 14px rgba(32,42,68,0.08);}
+.panel:hover{transform:translateY(-2px); box-shadow:0 8px 20px -4px rgba(29,39,66,0.10);}
 .panel .seal{
-  width:40px; height:40px; margin:0 auto 8px; border-radius:50%;
-  background:radial-gradient(circle at 32% 28%, #9A5142, var(--claret) 55%, var(--claret-deep) 100%);
+  width:42px; height:42px; margin:0 auto 8px; border-radius:50%;
+  background:radial-gradient(circle at 32% 28%, #A55848, var(--claret) 58%, var(--claret-deep) 100%);
   display:flex; align-items:center; justify-content:center;
-  box-shadow:0 2px 6px rgba(94,46,38,0.4), inset 0 1px 1px rgba(255,255,255,0.25);
+  box-shadow:0 3px 8px rgba(88,41,33,0.38), inset 0 1px 2px rgba(255,255,255,0.3), 0 0 0 2px #F6ECDA;
 }
 .panel .heb-letter{
-  font-family:'Frank Ruhl Libre',serif; font-weight:900; font-size:19px; color:#F9E9C9;
+  font-family:'Frank Ruhl Libre',serif; font-weight:900; font-size:20px; color:#F9E9C9;
 }
-.panel .aliyah-name{font-size:12.5px; color:var(--ink-soft); margin-top:2px; font-weight:700;}
-.panel .pesukim{font-size:11.5px;color:var(--gold-deep); margin-top:4px; font-weight:700;}
-.panel select{margin-top:10px; font-size:14px; padding:9px 8px; white-space:normal;}
+.panel .aliyah-name{font-size:13.5px; color:var(--ink); margin-top:2px; font-weight:800;}
+.panel .pesukim{
+  display:inline-block; align-self:center; margin-top:4px;
+  font-size:11.5px; color:var(--gold-deep); background:#F3E8CE;
+  padding:2px 10px; border-radius:20px; font-weight:800;
+}
+.panel select{margin-top:10px; font-size:13.5px; padding:8px 8px; white-space:normal; font-weight:700;}
 .panel input[type=text]{font-size:13px;}
 .panel .mismatch{
-  font-size:11px;color:var(--warn); margin-top:6px; font-weight:700; line-height:1.4;
+  font-size:11.5px;color:var(--warn); background:rgba(248,229,223,0.65);
+  border-radius:7px; padding:5px 7px; margin-top:8px; font-weight:700; line-height:1.4;
 }
+.panel-actions-row{
+  display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:9px;
+}
+.panel-actions-row > *{flex:1; min-width:95px;}
+.lock-badge{
+  position:absolute; top:8px; left:8px;
+  background:#F3E6C8; color:var(--gold-deep); border:1px solid #DFC99B;
+  font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:20px;
+}
+.queue-cap-pill{
+  font-size:10.5px; font-weight:700; color:var(--gold-deep); background:#F3E8CE;
+  padding:2px 8px; border-radius:20px; white-space:nowrap;
+}
+.queue-cap-pill.strong{background:var(--good-bg); color:var(--good);}
 
 .confirmed-box{
   background:var(--good-bg); border:1px solid #C9D9BB; border-radius:10px;
@@ -220,9 +261,21 @@ tbody tr:hover td{background:rgba(184,146,79,0.05);}
 .archive-summary{font-size:12px;color:var(--ink-soft);margin-top:2px;}
 
 /* per-aliyah panel state - a quick visual scan of the week without reading every card */
-.panel[data-state="filled"]{border-color:#C9D9BB; box-shadow:inset 0 0 0 1px rgba(75,107,62,0.15);}
-.panel[data-state="warning"]{border-color:#E7C9B9; box-shadow:inset 0 0 0 1px rgba(155,74,61,0.12);}
-.panel[data-state="empty"]{border-style:dashed;}
+.panel[data-state="filled"]{
+  background:linear-gradient(180deg, #FFFEFB 0%, #F4F8F2 100%);
+  border-color:#BDCEB4;
+  box-shadow:inset 0 3px 0 0 var(--good), 0 2px 6px rgba(62,107,66,0.06);
+}
+.panel[data-state="warning"]{
+  background:linear-gradient(180deg, #FFFEFB 0%, #FDF4F1 100%);
+  border-color:#E5BFB3;
+  box-shadow:inset 0 3px 0 0 var(--warn), 0 2px 6px rgba(155,74,61,0.06);
+}
+.panel[data-state="empty"]{
+  background:rgba(255,252,246,0.65);
+  border-style:dashed;
+  border-color:#D8C69C;
+}
 
 .progress-bar{
   height:7px; border-radius:20px; background:var(--line); overflow:hidden; margin-top:8px;
@@ -1462,8 +1515,72 @@ function runAssignment(parashaName, date, locks){
     .filter(p=>!usedNormal.has(p.id) && !split.some(pesukim=>fits(p, pesukim)))
     .map(p=>p.id);
 
-  STATE.current = { date, parasha: parashaName, assign, deferred, unfilledReasons, recencyWarnings, recentlyExcluded, confirmed:false };
+  STATE.current = { date, parasha: parashaName, assign, locks:{...locks}, deferred, unfilledReasons, recencyWarnings, recentlyExcluded, confirmed:false };
   saveCurrent();
+}
+
+// Suggests and applies the next best available candidate in fairness order for a single aliyah
+// on the active draft (`STATE.current`), avoiding whoever is currently holding it (and keeping a
+// per-aliyah skip memory on the draft so clicking "הצע מחליף" repeatedly cycles through candidates).
+function suggestReplacementForAliyah(aliyahNum){
+  if(!STATE.current) return;
+  const parashaName = STATE.current.parasha;
+  const split = getSplit(parashaName);
+  const pesukim = split[aliyahNum - 1];
+  const assign = STATE.current.assign || {};
+  const currentId = assign[aliyahNum] || assign[String(aliyahNum)] || null;
+  if(!STATE.current.skippedByAliyah) STATE.current.skippedByAliyah = {};
+  const skipList = STATE.current.skippedByAliyah[aliyahNum] || (STATE.current.skippedByAliyah[aliyahNum] = []);
+  if(currentId && !currentId.startsWith('guest:') && !skipList.includes(currentId)){
+    skipList.push(currentId);
+  }
+  const usedIds = new Set(
+    Object.keys(assign)
+      .filter(k => String(k) !== String(aliyahNum))
+      .map(k => assign[k])
+      .filter(v => v && !v.startsWith('guest:'))
+  );
+  const statsMap = buildStatsMap();
+  const eligible = STATE.congregants
+    .filter(c => !c.paused && !usedIds.has(c.id) && !isRecencyBlocked(statsMap[c.id], parashaName))
+    .sort((a,b) => fairnessCompareStable(a, b, statsMap, parashaName));
+
+  function pickFrom(ignoreSkip){
+    const pool = ignoreSkip ? eligible : eligible.filter(c => !skipList.includes(c.id));
+    // 1. Clean normal reader who fits
+    let cand = pool.find(c => !c.unrestricted && fits(c, pesukim) && !isRecencyWarning(statsMap[c.id], parashaName));
+    if(cand) return cand;
+    // 2. Clean strong reader (if big aliyah or no normal reader fits)
+    cand = pool.find(c => c.unrestricted && !isRecencyWarning(statsMap[c.id], parashaName));
+    if(cand) return cand;
+    // 3. Recent-warning normal reader who fits
+    cand = pool.find(c => !c.unrestricted && fits(c, pesukim));
+    if(cand) return cand;
+    // 4. Recent-warning strong reader
+    cand = pool.find(c => c.unrestricted);
+    return cand || null;
+  }
+
+  let nextPerson = pickFrom(false);
+  if(!nextPerson && skipList.length){
+    // Cycled through all fitting candidates - reset skip list (excluding only the currently-selected person)
+    STATE.current.skippedByAliyah[aliyahNum] = currentId && !currentId.startsWith('guest:') ? [currentId] : [];
+    nextPerson = pickFrom(false);
+  }
+  if(!nextPerson){
+    notice('לא נמצא מחליף פנוי אחר שמתאים לעלייה זו (ללא הפרת כלל הברזל).');
+    return;
+  }
+  assign[aliyahNum] = nextPerson.id;
+  if(!STATE.current.recencyWarnings) STATE.current.recencyWarnings = {};
+  if(isRecencyWarning(statsMap[nextPerson.id], parashaName)){
+    STATE.current.recencyWarnings[aliyahNum] = `${nextPerson.name} קרא לאחרונה לפני פחות מ-3 שבתות - זו הייתה האפשרות הכי טובה שנמצאה, כדאי לשים לב.`;
+  } else {
+    delete STATE.current.recencyWarnings[aliyahNum];
+  }
+  if(STATE.current.unfilledReasons) delete STATE.current.unfilledReasons[aliyahNum];
+  saveCurrent();
+  render();
 }
 
 function confirmAssignment(){
@@ -1803,10 +1920,64 @@ function buildWeekPanelsReadOnly(parashaName, assignObj, reasons){
   return html;
 }
 
-function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings){
+function buildSmartSelectOptions(parashaName, pesukim, aliyahIdx, assignedId, assignedAliyahOf, statsMap){
+  const sorted = STATE.congregants.slice().sort((a,b)=>fairnessCompareStable(a, b, statsMap, parashaName));
+  const bestFit = [];
+  const strongClean = [];
+  const recentFit = [];
+  const outOfRange = [];
+  const blocked = [];
+
+  for(const c of sorted){
+    const st = statsMap[c.id] || {total:0, lastEntry:null};
+    const heldElsewhere = assignedAliyahOf[c.id] && assignedAliyahOf[c.id].some(k=>k!==aliyahIdx);
+    const isIronBlocked = isRecencyBlocked(st, parashaName);
+    const isRecentWarn = isRecencyWarning(st, parashaName);
+    const isFit = fits(c, pesukim);
+    const capText = c.unrestricted ? 'קורא חזק' : `עד ${c.level}`;
+    const totalText = `${st.total} עליות`;
+
+    let statusSuffix = '';
+    if(heldElsewhere) statusSuffix = ' — משובץ לעלייה אחרת';
+    else if(c.paused) statusSuffix = ' — מושהה';
+    else if(isIronBlocked) statusSuffix = ` — קרא בפרשת ${st.lastEntry.parasha} (שבוע שעבר)`;
+    else if(isRecentWarn) statusSuffix = ' — קרא לפני 2 שבתות';
+    else if(!isFit) statusSuffix = pesukim > c.level ? ' — מעל הטווח' : ' — מתחת לטווח';
+
+    const optHtml = `<option value="${c.id}" ${assignedId===c.id?'selected':''} ${heldElsewhere?'disabled':''}>${c.name} (${capText} · ${totalText})${statusSuffix}</option>`;
+
+    if(heldElsewhere || c.paused || isIronBlocked){
+      blocked.push(optHtml);
+    } else if(c.unrestricted){
+      if(isRecentWarn) recentFit.push(optHtml);
+      else strongClean.push(optHtml);
+    } else if(isFit){
+      if(isRecentWarn) recentFit.push(optHtml);
+      else bestFit.push(optHtml);
+    } else {
+      outOfRange.push(optHtml);
+    }
+  }
+
+  const groups = [];
+  if(bestFit.length) groups.push(`<optgroup label="✅ מתאימים ופנויים (לפי תור ההוגנות)">${bestFit.join('')}</optgroup>`);
+  if(strongClean.length) groups.push(`<optgroup label="💪 קוראים חזקים פנויים (לפי התור)">${strongClean.join('')}</optgroup>`);
+  if(recentFit.length) groups.push(`<optgroup label="⏱ מתאימים אך קראו לפני 2 שבתות">${recentFit.join('')}</optgroup>`);
+  if(outOfRange.length) groups.push(`<optgroup label="↕️ מחוץ לטווח הפסוקים של העלייה">${outOfRange.join('')}</optgroup>`);
+  if(blocked.length) groups.push(`<optgroup label="⛔ חסומים השבוע (שבוע שעבר / מושהים / משובצים)">${blocked.join('')}</optgroup>`);
+  return groups.join('');
+}
+
+function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings, opts){
   reasons = reasons || {};
   recencyWarnings = recencyWarnings || {};
+  opts = opts || {};
+  const isLockMode = !!opts.isLockMode;
+  const allowSuggest = !!opts.allowSuggest;
+  const locks = opts.locks || {};
+  const waSent = opts.waSent || {};
   const split = getSplit(parashaName);
+  const statsMap = buildStatsMap();
   // which aliyah number(s) each (non-guest) person currently holds this week -
   // used to fully block picking them anywhere else, not just warn about it
   const assignedAliyahOf = {};
@@ -1821,6 +1992,8 @@ function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings){
     const isGuest = assignedId.startsWith && assignedId.startsWith('guest:');
     const guestName = isGuest ? assignedId.slice(6) : '';
     const person = isGuest ? null : resolvePerson(assignedId);
+    const isLockedSlot = !!(locks[i] || locks[String(i)]);
+    const isSent = !!(waSent[i] || waSent[String(i)]);
     let mismatch = '';
     if(person && !fits(person, pesukim)){
       const lowerPct = (STATE.matchSettings && STATE.matchSettings.lower) || 80;
@@ -1833,26 +2006,28 @@ function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings){
     const isDuplicate = assignedId && !isGuest && assignedAliyahOf[assignedId] && assignedAliyahOf[assignedId].length>1;
     const recencyNote = recencyWarnings[i] || recencyWarnings[String(i)] || '';
     const state = !assignedId ? 'empty' : (mismatch || isDuplicate || recencyNote) ? 'warning' : 'filled';
+    const optionsHtml = buildSmartSelectOptions(parashaName, pesukim, i, assignedId, assignedAliyahOf, statsMap);
     html += `
       <div class="panel" data-state="${state}">
+        ${isLockedSlot && !isLockMode ? `<div class="lock-badge" title="ננעל ידנית מראש">🔒 נעול מראש</div>` : ''}
         <div class="seal"><div class="heb-letter">${HEB_LETTERS[i-1]}</div></div>
         <div class="aliyah-name">עולה ${ALIYAH_NAMES[i-1]}</div>
         <div class="pesukim">${pesukim} פסוקים</div>
         <select data-aliyah="${i}">
-          <option value="">— לא שובץ —</option>
-          ${STATE.congregants.slice().sort((a,b)=>a.name.localeCompare(b.name,'he')).map(c=>{
-            const heldElsewhere = assignedAliyahOf[c.id] && assignedAliyahOf[c.id].some(k=>k!==i);
-            return `<option value="${c.id}" ${assignedId===c.id?'selected':''} ${heldElsewhere?'disabled':''}>${c.name} ${c.unrestricted?'(קורא חזק)':`(עד ${c.level})`}${c.paused?' - מושהה':''}${heldElsewhere?' - משובץ לעלייה אחרת':''}</option>`;
-          }).join('')}
+          <option value="">${isLockMode ? '— ללא נעילה —' : '— לא שובץ —'}</option>
+          ${optionsHtml}
           <option value="guest" ${isGuest?'selected':''}>👤 אורח (שם מותאם)</option>
         </select>
         ${isGuest ? `<input type="text" data-guestname="${i}" placeholder="שם האורח" value="${guestName}" style="margin-top:6px;font-size:13px;padding:6px 8px;">` : ''}
-        ${(person && !isGuest) ? (()=>{
-          const link = whatsappLinkForPerson(person, parashaName, ALIYAH_NAMES[i-1]);
-          return link
-            ? `<a class="btn btn-outline btn-sm" href="${link}" target="_blank" style="margin-top:8px;display:inline-block;">📱 שלח לו</a>`
-            : `<div class="mini" style="margin-top:8px;">אין טלפון שמור</div>`;
-        })() : ''}
+        ${(!isLockMode && (allowSuggest || (person && !isGuest))) ? `<div class="panel-actions-row">
+          ${allowSuggest ? `<button type="button" class="btn btn-outline btn-sm btn-suggest" data-suggest="${i}" title="הצע מתפלל מתאים אחר לפי תור ההוגנות">${assignedId ? '🔄 החלף באחר' : '✨ הצע מתפלל'}</button>` : ''}
+          ${(person && !isGuest) ? (()=>{
+            const link = whatsappLinkForPerson(person, parashaName, ALIYAH_NAMES[i-1]);
+            return link
+              ? `<a class="btn ${isSent ? 'btn-wa-sent' : 'btn-outline'} btn-sm" data-wasend="${i}" href="${link}" target="_blank">${isSent ? '✓ נשלח (שלח שוב)' : '📱 שלח לו'}</a>`
+              : `<div class="mini" style="margin-top:4px;width:100%;">אין טלפון שמור</div>`;
+          })() : ''}
+        </div>` : ''}
         ${mismatch ? `<div class="mismatch">${mismatch}</div>`:''}
         ${isDuplicate ? `<div class="mismatch">⚠ מתפלל זה מופיע ביותר מעלייה אחת בנתונים - כדאי לתקן</div>`:''}
         ${recencyNote ? `<div class="mismatch">⏱ ${recencyNote}</div>`:''}
@@ -1936,7 +2111,7 @@ function renderAssignTab(){
       wrap.appendChild(prevCard);
     }
 
-    const lockPanels = buildWeekPanels(effectiveParasha, STATE.pendingLocks);
+    const lockPanels = buildWeekPanels(effectiveParasha, STATE.pendingLocks, null, null, { isLockMode: true });
     const lockCard = el(`<div class="card"></div>`);
     lockCard.innerHTML = `<h2>נעילת עלייה מסוימת (רשות)</h2>
       <div class="note">אם כבר ידוע מראש שמישהו חייב לקבל עלייה מסוימת (למשל בר מצווה) — בחר אותו כאן לפני "בצע שיבוץ". שאר העליות ישובצו הוגן כרגיל סביב הבחירה הזו.</div>
@@ -1966,7 +2141,11 @@ function renderAssignTab(){
   }
 
   if(STATE.current){
-    const panels = buildWeekPanels(STATE.current.parasha, STATE.current.assign, STATE.current.unfilledReasons, STATE.current.recencyWarnings);
+    const panels = buildWeekPanels(STATE.current.parasha, STATE.current.assign, STATE.current.unfilledReasons, STATE.current.recencyWarnings, {
+      allowSuggest: true,
+      locks: STATE.current.locks || {},
+      waSent: STATE.current.waSent || {}
+    });
     const filled = countFilled(STATE.current.assign);
     const c2 = el(`<div class="card"></div>`);
     const recentNames = (STATE.current.recentlyExcluded||[]).map(id=>{ const p = STATE.congregants.find(c=>c.id===id); return p ? p.name : null; }).filter(Boolean);
@@ -1976,12 +2155,12 @@ function renderAssignTab(){
       ${recentNames.length ? `<div class="note" style="color:var(--warn);">⏱ לא נשקלו השבוע (קראו לפני שבוע או פחות - כלל ברזל): ${recentNames.join(', ')}.</div>` : ''}
       <div class="week-strip">${panels}</div>
       <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-ink" id="confirmBtn">אשר שיבוץ ועדכן היסטוריה</button>
-        <button class="btn btn-outline" id="waGroupBtn">📱 שלח לקבוצה</button>
-        <button class="btn btn-outline" id="copyTextBtn">📋 העתק כטקסט</button>
-        <button class="btn btn-outline" id="printBtn">🖨️ הדפסה</button>
-        <button class="btn btn-outline" id="showQueueBtn">🔍 למה זה ככה?</button>
-        <button class="btn btn-outline" id="resetAssignBtn">איפוס עליות</button>
+        <div><button class="btn btn-ink" id="confirmBtn">✓ אשר שיבוץ ועדכן היסטוריה</button></div>
+        <div><button class="btn btn-outline" id="waGroupBtn">📱 שלח לקבוצה</button></div>
+        <div><button class="btn btn-outline" id="copyTextBtn">📋 העתק כטקסט</button></div>
+        <div><button class="btn btn-outline" id="printBtn">🖨️ הדפסה</button></div>
+        <div><button class="btn btn-outline" id="showQueueBtn">🔍 למה זה ככה?</button></div>
+        <div><button class="btn btn-outline" id="resetAssignBtn">איפוס עליות</button></div>
       </div>
     `;
     wrap.appendChild(c2);
@@ -1995,8 +2174,24 @@ function renderAssignTab(){
           if(val==='guest') STATE.current.assign[num] = 'guest:';
           else if(val) STATE.current.assign[num] = val;
           else delete STATE.current.assign[num];
+          if(STATE.current.waSent) delete STATE.current.waSent[num];
           saveCurrent();
           render();
+        };
+      });
+      c2.querySelectorAll('button[data-suggest]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const num = parseInt(btn.dataset.suggest, 10);
+          suggestReplacementForAliyah(num);
+        };
+      });
+      c2.querySelectorAll('a[data-wasend]').forEach(a=>{
+        a.onclick = ()=>{
+          const num = a.dataset.wasend;
+          if(!STATE.current.waSent) STATE.current.waSent = {};
+          STATE.current.waSent[num] = true;
+          saveCurrent();
+          setTimeout(()=>render(), 150);
         };
       });
       c2.querySelectorAll('input[data-guestname]').forEach(inp=>{
@@ -2013,8 +2208,11 @@ function renderAssignTab(){
       c2.querySelector('#printBtn').onclick = ()=> printWeek(STATE.current.parasha, STATE.current.date, STATE.current.assign);
       c2.querySelector('#resetAssignBtn').onclick = ()=>{
         STATE.current.assign = {};
+        STATE.current.locks = {};
+        STATE.current.waSent = {};
         STATE.current.deferred = [];
         STATE.current.unfilledReasons = {};
+        STATE.current.recencyWarnings = {};
         saveCurrent();
         render();
       };
@@ -2851,7 +3049,7 @@ function renderQueueTab(){
     const stats = liveStats[c.id] || {total:0, lastEntry:null};
     const total = stats.total;
     const info = current ? explainQueuePerson(c, current, split, liveStats) : null;
-    let rowClass = '', pillClass = 'muted', pillLabel = 'טרם עלה', detail = '';
+    let rowClass = '', pillClass = 'muted', pillLabel = 'טרם עלה', detail = '', actionBtnHtml = '';
     if(info){
       if(info.selected){
         rowClass = 'row-selected';
@@ -2863,6 +3061,9 @@ function renderQueueTab(){
         pillClass = info.actionable ? 'pending' : 'muted';
         pillLabel = info.actionable ? 'פנוי לשיבוץ ידני' : 'לא התאים';
         detail = info.reason;
+        if(info.actionable && info.aliyahNum){
+          actionBtnHtml = `<div style="margin-top:6px;"><button type="button" class="btn btn-gold btn-sm" data-quickassign-person="${c.id}" data-quickassign-aliyah="${info.aliyahNum}">➕ שבץ עכשיו לעלייה ${ALIYAH_NAMES[info.aliyahNum-1]}</button></div>`;
+        }
       }
     } else if(stats.lastEntry){
       // idle state (no draft open yet): showing "ממתין" on all 23 rows said nothing - real,
@@ -2871,16 +3072,18 @@ function renderQueueTab(){
       detail = `לאחרונה: ${formatDate(stats.lastEntry.date)} · פרשת ${stats.lastEntry.parasha}`;
     }
     const barPct = (total / maxTotal * 100).toFixed(1);
+    const capPill = c.unrestricted ? `<span class="queue-cap-pill strong">קורא חזק</span>` : `<span class="queue-cap-pill">עד ${c.level} פס'</span>`;
     return `
       <tr class="${rowClass}" style="--i:${idx}">
         <td style="width:46px;"><div class="queue-rank-badge">${idx+1}</div></td>
         <td class="name-cell">
-          <div class="queue-name-line"><b>${c.name}</b><span class="queue-total-pill">${total} עליות</span></div>
+          <div class="queue-name-line"><b>${c.name}</b>${capPill}<span class="queue-total-pill">${total} עליות</span></div>
           <div class="queue-total-track"><div class="queue-total-fill" style="width:${barPct}%"></div></div>
         </td>
         <td class="queue-status-td">
           <span class="queue-status-pill ${pillClass}">${pillLabel}</span>
           ${detail ? `<div class="queue-status-detail">${detail}</div>` : ''}
+          ${actionBtnHtml}
         </td>
       </tr>`;
   }).join('');
@@ -2898,6 +3101,20 @@ function renderQueueTab(){
     </div>
   `;
   wrap.appendChild(card);
+  setTimeout(()=>{
+    card.querySelectorAll('button[data-quickassign-person]').forEach(btn=>{
+      btn.onclick = ()=>{
+        if(!STATE.current) return;
+        const pid = btn.dataset.quickassignPerson;
+        const aliyahNum = btn.dataset.quickassignAliyah;
+        STATE.current.assign[aliyahNum] = pid;
+        if(STATE.current.unfilledReasons) delete STATE.current.unfilledReasons[aliyahNum];
+        saveCurrent();
+        render();
+        notice(`שובץ בהצלחה לעלייה ${ALIYAH_NAMES[parseInt(aliyahNum,10)-1]}!`);
+      };
+    });
+  },0);
   return wrap;
 }
 

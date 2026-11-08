@@ -1088,8 +1088,72 @@ function runAssignment(parashaName, date, locks){
     .filter(p=>!usedNormal.has(p.id) && !split.some(pesukim=>fits(p, pesukim)))
     .map(p=>p.id);
 
-  STATE.current = { date, parasha: parashaName, assign, deferred, unfilledReasons, recencyWarnings, recentlyExcluded, confirmed:false };
+  STATE.current = { date, parasha: parashaName, assign, locks:{...locks}, deferred, unfilledReasons, recencyWarnings, recentlyExcluded, confirmed:false };
   saveCurrent();
+}
+
+// Suggests and applies the next best available candidate in fairness order for a single aliyah
+// on the active draft (`STATE.current`), avoiding whoever is currently holding it (and keeping a
+// per-aliyah skip memory on the draft so clicking "הצע מחליף" repeatedly cycles through candidates).
+function suggestReplacementForAliyah(aliyahNum){
+  if(!STATE.current) return;
+  const parashaName = STATE.current.parasha;
+  const split = getSplit(parashaName);
+  const pesukim = split[aliyahNum - 1];
+  const assign = STATE.current.assign || {};
+  const currentId = assign[aliyahNum] || assign[String(aliyahNum)] || null;
+  if(!STATE.current.skippedByAliyah) STATE.current.skippedByAliyah = {};
+  const skipList = STATE.current.skippedByAliyah[aliyahNum] || (STATE.current.skippedByAliyah[aliyahNum] = []);
+  if(currentId && !currentId.startsWith('guest:') && !skipList.includes(currentId)){
+    skipList.push(currentId);
+  }
+  const usedIds = new Set(
+    Object.keys(assign)
+      .filter(k => String(k) !== String(aliyahNum))
+      .map(k => assign[k])
+      .filter(v => v && !v.startsWith('guest:'))
+  );
+  const statsMap = buildStatsMap();
+  const eligible = STATE.congregants
+    .filter(c => !c.paused && !usedIds.has(c.id) && !isRecencyBlocked(statsMap[c.id], parashaName))
+    .sort((a,b) => fairnessCompareStable(a, b, statsMap, parashaName));
+
+  function pickFrom(ignoreSkip){
+    const pool = ignoreSkip ? eligible : eligible.filter(c => !skipList.includes(c.id));
+    // 1. Clean normal reader who fits
+    let cand = pool.find(c => !c.unrestricted && fits(c, pesukim) && !isRecencyWarning(statsMap[c.id], parashaName));
+    if(cand) return cand;
+    // 2. Clean strong reader (if big aliyah or no normal reader fits)
+    cand = pool.find(c => c.unrestricted && !isRecencyWarning(statsMap[c.id], parashaName));
+    if(cand) return cand;
+    // 3. Recent-warning normal reader who fits
+    cand = pool.find(c => !c.unrestricted && fits(c, pesukim));
+    if(cand) return cand;
+    // 4. Recent-warning strong reader
+    cand = pool.find(c => c.unrestricted);
+    return cand || null;
+  }
+
+  let nextPerson = pickFrom(false);
+  if(!nextPerson && skipList.length){
+    // Cycled through all fitting candidates - reset skip list (excluding only the currently-selected person)
+    STATE.current.skippedByAliyah[aliyahNum] = currentId && !currentId.startsWith('guest:') ? [currentId] : [];
+    nextPerson = pickFrom(false);
+  }
+  if(!nextPerson){
+    notice('לא נמצא מחליף פנוי אחר שמתאים לעלייה זו (ללא הפרת כלל הברזל).');
+    return;
+  }
+  assign[aliyahNum] = nextPerson.id;
+  if(!STATE.current.recencyWarnings) STATE.current.recencyWarnings = {};
+  if(isRecencyWarning(statsMap[nextPerson.id], parashaName)){
+    STATE.current.recencyWarnings[aliyahNum] = `${nextPerson.name} קרא לאחרונה לפני פחות מ-3 שבתות - זו הייתה האפשרות הכי טובה שנמצאה, כדאי לשים לב.`;
+  } else {
+    delete STATE.current.recencyWarnings[aliyahNum];
+  }
+  if(STATE.current.unfilledReasons) delete STATE.current.unfilledReasons[aliyahNum];
+  saveCurrent();
+  render();
 }
 
 function confirmAssignment(){
@@ -1274,4 +1338,13 @@ console.log(`Avg aliyah size for Strong reader (excluding <10 pasuk orphans): ${
 assert(ironRuleViolations === 0, 'Expected 0 iron rule violations');
 assert(Math.abs(avgStrongReads - avgNormalReads) < 5, 'Expected strong and normal readers to have nearly equal average reads');
 assert(avgStrongNonTinyPesukim > avgNormalPesukim + 12, 'Expected strong readers to get significantly larger aliyot on average');
-console.log('✅ All 5 tests & 1,080-week simulation passed!');
+
+// 6. Test suggestReplacementForAliyah & locks preservation
+runAssignment('בראשית', '2026-10-10', {1: 'c1'});
+assert(STATE.current.locks && STATE.current.locks[1] === 'c1', 'Expected locks to be saved on STATE.current');
+const beforeAliyah2 = STATE.current.assign[2];
+suggestReplacementForAliyah(2);
+const afterAliyah2 = STATE.current.assign[2];
+assert(afterAliyah2 && afterAliyah2 !== beforeAliyah2, `Expected suggestReplacementForAliyah to change aliyah 2 from ${beforeAliyah2} to ${afterAliyah2}`);
+console.log('✅ Test 6 passed: suggestReplacementForAliyah and lock persistence work accurately.');
+console.log('✅ All 6 tests & 1,080-week simulation passed!');
