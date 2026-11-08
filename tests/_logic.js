@@ -260,7 +260,7 @@ async function saveParashaCalendar(){
 async function fetchViaHebcalApi(){
   try{
     const start = new Date(); start.setDate(start.getDate()-380);
-    const end = new Date(); end.setDate(end.getDate()+200);
+    const end = new Date(); end.setDate(end.getDate()+380);
     const fmt = d => d.toISOString().slice(0,10);
     const url = `https://www.hebcal.com/hebcal?cfg=json&v=1&maj=off&min=off&mod=off&nx=off&mf=off&ss=off&s=on&start=${fmt(start)}&end=${fmt(end)}&i=on`;
     const res = await fetch(url);
@@ -285,7 +285,7 @@ async function fetchViaHebcalLibrary(){
     const day = d.getDay();
     d.setDate(d.getDate() + ((6 - day + 7) % 7)); // land on a Saturday
     const calendar = [];
-    for(let i=0; i<83; i++){ // ~380 days back through ~200 days forward
+    for(let i=0; i<110; i++){ // ~380 days back through ~380 days forward
       const hd = new HDate(d);
       const info = getSedra(hd.getFullYear(), true).lookup(hd);
       if(info && !info.chag){
@@ -302,6 +302,103 @@ async function fetchViaHebcalLibrary(){
     STATE.calendarStatus = 'ok';
     return true;
   }catch(e){ return false; }
+}
+
+// Offline/instant Hebrew year leap-year & reading-schedule awareness using the browser's built-in
+// Intl Hebrew calendar, refined automatically by the live Hebcal Israel schedule (`parashaCalendar`).
+const COMBINED_PAIRS_LIST = [
+  ["ויקהל-פקודי", "ויקהל", "פקודי"],
+  ["תזריע-מצורע", "תזריע", "מצורע"],
+  ["אחרי מות-קדושים", "אחרי מות", "קדושים"],
+  ["בהר-בחוקותי", "בהר", "בחוקותי"],
+  ["מטות-מסעי", "מטות", "מסעי"],
+  ["נצבים-וילך", "נצבים", "וילך"]
+];
+function getCurrentHebrewYearInfo(refDateStr){
+  try{
+    const d = refDateStr ? new Date(refDateStr) : new Date();
+    const parts = new Intl.DateTimeFormat('en-u-ca-hebrew', {year:'numeric', month:'long'}).formatToParts(d);
+    const yStr = (parts.find(p=>p.type==='year')||{}).value || '';
+    const hYear = parseInt(yStr, 10);
+    if(!hYear) return null;
+    // Metonic cycle: years 3, 6, 8, 11, 14, 17, 19 of the 19-year cycle are leap years (שנה מעוברת)
+    const rem = ((hYear % 19) + 19) % 19;
+    const isLeap = [0, 3, 6, 8, 11, 14, 17].includes(rem);
+    return { hYear, isLeap };
+  }catch(e){ return null; }
+}
+// Returns the active parasha options for the current year cycle vs. inactive ones (e.g. combined
+// pairs during a leap year when parashot are read separately, or split pairs when combined).
+// Uses `STATE.parashaCalendar` (upcoming 52 weeks from Hebcal Israel schedule) when available,
+// and falls back automatically to the Hebrew leap-year calculation (`getCurrentHebrewYearInfo`).
+function getActiveParashotForCurrentYear(){
+  const todayStr = new Date().toISOString().slice(0,10);
+  const oneYearAhead = new Date(); oneYearAhead.setDate(oneYearAhead.getDate()+355);
+  const limitStr = oneYearAhead.toISOString().slice(0,10);
+  const upcoming = (STATE.parashaCalendar||[]).filter(c=>c.date>=todayStr && c.date<=limitStr);
+  const hebInfo = getCurrentHebrewYearInfo(todayStr);
+
+  // Determine for each of the 6 combinable pairs whether it is combined or split this year
+  const pairIsCombined = {};
+  for(const [comb, p1, p2] of COMBINED_PAIRS_LIST){
+    if(upcoming.length >= 20){
+      // Live Hebcal schedule knows the exact Israel custom for this year
+      if(upcoming.some(c=>c.name===comb)) pairIsCombined[comb] = true;
+      else if(upcoming.some(c=>c.name===p1 || c.name===p2)) pairIsCombined[comb] = false;
+      else pairIsCombined[comb] = hebInfo ? !hebInfo.isLeap : false;
+    } else {
+      // Offline fallback: in a leap year (שנה מעוברת), Vayakhel-Pekudei, Tazria-Metzora,
+      // Acharei-Kedoshim, Behar-Bechukotai are ALWAYS separate!
+      if(hebInfo && hebInfo.isLeap){
+        pairIsCombined[comb] = (comb === "מטות-מסעי"); // In leap years, usually only Matot-Masei (or Nitzavim-Vayeilech) can combine
+      } else {
+        pairIsCombined[comb] = true;
+      }
+    }
+  }
+
+  const excludedSet = new Set();
+  for(const [comb, p1, p2] of COMBINED_PAIRS_LIST){
+    if(pairIsCombined[comb]){
+      excludedSet.add(p1);
+      excludedSet.add(p2);
+    } else {
+      excludedSet.add(comb);
+    }
+  }
+
+  // Build ordered active list in standard Torah reading order (inserting combined pairs in their
+  // natural place instead of tacking them onto the end of the list)
+  const activeList = [];
+  const otherList = [];
+  const combByFirst = {};
+  for(const [comb, p1] of COMBINED_PAIRS_LIST){ combByFirst[p1] = comb; }
+
+  for(let i=0; i<54; i++){
+    const [name, total] = PARASHOT_DEFAULT_TOTALS[i];
+    const combName = combByFirst[name];
+    if(combName){
+      const combEntry = PARASHOT_DEFAULT_TOTALS.find(p=>p[0]===combName);
+      if(pairIsCombined[combName] && combEntry){
+        activeList.push(combEntry);
+      }
+    }
+    if(!excludedSet.has(name)){
+      activeList.push([name, total]);
+    } else {
+      otherList.push([name, total]);
+    }
+  }
+  for(const [comb] of COMBINED_PAIRS_LIST){
+    if(excludedSet.has(comb)){
+      const combEntry = PARASHOT_DEFAULT_TOTALS.find(p=>p[0]===comb);
+      if(combEntry) otherList.push(combEntry);
+    }
+  }
+
+  const separatedCount = COMBINED_PAIRS_LIST.filter(([comb])=>!pairIsCombined[comb]).length;
+  const isLeapYear = hebInfo ? hebInfo.isLeap : (separatedCount >= 4);
+  return { activeList, otherList, isLeapYear, hebYear: hebInfo ? hebInfo.hYear : null, pairIsCombined };
 }
 
 // Looks up the real upcoming date for a specific parasha name from the precomputed calendar.
