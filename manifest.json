@@ -1,0 +1,27 @@
+{
+  "name": "שיבוץ עליות לתורה — בית כנסת נצח בנים",
+  "short_name": "שיבוץ עליות",
+  "description": "מערכת שיבוץ עליות לתורה הוגנת ומותאמת אישית — בית כנסת נצח בנים",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4EBDC",
+  "theme_color": "#1D2742",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjM2IiBmaWxsPSIjMUMyNTQxIi8+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJyb2QiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNDN0EwNUMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM4RjZCMkUiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIyNSIgeT0iMjkiIHdpZHRoPSIyOSIgaGVpZ2h0PSIxMzQiIHJ4PSIxNCIgZmlsbD0idXJsKCNyb2QpIi8+PHJlY3QgeD0iMTM4IiB5PSIyOSIgd2lkdGg9IjI5IiBoZWlnaHQ9IjEzNCIgcng9IjE0IiBmaWxsPSJ1cmwoI3JvZCkiLz48cmVjdCB4PSI1MCIgeT0iNTgiIHdpZHRoPSI5MiIgaGVpZ2h0PSI3NSIgcng9IjgiIGZpbGw9IiNGQkY2RTkiLz48bGluZSB4MT0iNjciIHkxPSI3OSIgeDI9IjEyNSIgeTI9Ijc5IiBzdHJva2U9IiM3QzNGMzQiIHN0cm9rZS13aWR0aD0iNiIvPjxsaW5lIHgxPSI2NyIgeTE9Ijk2IiB4Mj0iMTI1IiB5Mj0iOTYiIHN0cm9rZT0iIzdDM0YzNCIgc3Ryb2tlLXdpZHRoPSI2Ii8+PGxpbmUgeDE9IjY3IiB5MT0iMTEzIiB4Mj0iMTAwIiB5Mj0iMTEzIiBzdHJva2U9IiM3QzNGMzQiIHN0cm9rZS13aWR0aD0iNiIvPjwvc3ZnPg==",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjM2IiBmaWxsPSIjMUMyNTQxIi8+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJyb2QiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNDN0EwNUMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM4RjZCMkUiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIyNSIgeT0iMjkiIHdpZHRoPSIyOSIgaGVpZ2h0PSIxMzQiIHJ4PSIxNCIgZmlsbD0idXJsKCNyb2QpIi8+PHJlY3QgeD0iMTM4IiB5PSIyOSIgd2lkdGg9IjI5IiBoZWlnaHQ9IjEzNCIgcng9IjE0IiBmaWxsPSJ1cmwoI3JvZCkiLz48cmVjdCB4PSI1MCIgeT0iNTgiIHdpZHRoPSI5MiIgaGVpZ2h0PSI3NSIgcng9IjgiIGZpbGw9IiNGQkY2RTkiLz48bGluZSB4MT0iNjciIHkxPSI3OSIgeDI9IjEyNSIgeTI9Ijc5IiBzdHJva2U9IiM3QzNGMzQiIHN0cm9rZS13aWR0aD0iNiIvPjxsaW5lIHgxPSI2NyIgeTE9Ijk2IiB4Mj0iMTI1IiB5Mj0iOTYiIHN0cm9rZT0iIzdDM0YzNCIgc3Ryb2tlLXdpZHRoPSI2Ii8+PGxpbmUgeDE9IjY3IiB5MT0iMTEzIiB4Mj0iMTAwIiB5Mj0iMTEzIiBzdHJva2U9IiM3QzNGMzQiIHN0cm9rZS13aWR0aD0iNiIvPjwvc3ZnPg==",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -507,6 +507,65 @@ console.log('\\n--- 11. 1,080-Week (20-Year) Stress Simulation & Full Tab Render
   check('11e. All 6 UI tabs render cleanly without error after 1,080 logged weeks', !renderCrashed);
 }
 
+// ---------------------------------------------------------------------------
+// 12. KOHEN / LEVI HALACHIC RULES ("נתפרדה החבילה") & NEW UX UPGRADES
+// ---------------------------------------------------------------------------
+console.log('\\n--- 12. Kohen / Levi Halachic Rules ("נתפרדה החבילה") & UX Upgrades ---');
+{
+  // 12a. When both Kohen and Levi are present, Kohen gets Aliyah #1 and Levi gets Aliyah #2,
+  //      and other Kohanim/Leviim do not get called to Aliyot 3-7.
+  resetCleanState();
+  STATE.congregants.find(c => c.id === 'c1').tribe = 'kohen';
+  STATE.congregants.find(c => c.id === 'c2').tribe = 'kohen';
+  STATE.congregants.find(c => c.id === 'c4').tribe = 'levi';
+  STATE.congregants.find(c => c.id === 'c5').tribe = 'levi';
+  runAssignment('בראשית', '2026-10-10', {});
+  const a1 = resolvePerson(STATE.current.assign[1]);
+  const a2 = resolvePerson(STATE.current.assign[2]);
+  let kohenOrLeviIn3to7 = false;
+  for (let i = 3; i <= 7; i++) {
+    const p = resolvePerson(STATE.current.assign[i]);
+    if (p && (getPersonTribe(p) === 'kohen' || getPersonTribe(p) === 'levi')) kohenOrLeviIn3to7 = true;
+  }
+  check('12a. When Kohen & Levi are present -> Kohen on Aliyah #1, Levi on Aliyah #2, 0 Kohanim/Leviim on Aliyot 3-7',
+    a1 && getPersonTribe(a1) === 'kohen' && a2 && getPersonTribe(a2) === 'levi' && !kohenOrLeviIn3to7,
+    \`a1=\${a1 && a1.name}(\${getPersonTribe(a1)}), a2=\${a2 && a2.name}(\${getPersonTribe(a2)}), in3to7=\${kohenOrLeviIn3to7}\`);
+
+  // 12b. Halachic "אין שם כהן — נתפרדה החבילה" (Shulchan Aruch OC 135:6):
+  //      When there is NO Kohen in the synagogue (only Leviim and Yisraelim), if a Yisrael is on
+  //      Aliyah #1, a Levi is NEVER placed on Aliyah #2 ("שני"), across 50 different parashot!
+  resetCleanState();
+  // Mark 3 congregants as Leviim, 0 Kohanim
+  STATE.congregants.find(c => c.id === 'c4').tribe = 'levi';
+  STATE.congregants.find(c => c.id === 'c5').tribe = 'levi';
+  STATE.congregants.find(c => c.id === 'c6').tribe = 'levi';
+  let leviAfterYisraelViolations = 0;
+  let leviAssignedToOtherValidSlot = 0;
+  for (let w = 0; w < 54; w++) {
+    const pName = PARASHA_ORDER[w];
+    runAssignment(pName, '2026-10-10', {});
+    const p1 = resolvePerson(STATE.current.assign[1]);
+    const p2 = resolvePerson(STATE.current.assign[2]);
+    if (p1 && getPersonTribe(p1) === 'israel' && p2 && getPersonTribe(p2) === 'levi') {
+      leviAfterYisraelViolations++;
+    }
+    for (const slot of [1, 3, 4, 5, 6, 7]) {
+      const ps = resolvePerson(STATE.current.assign[slot]);
+      if (ps && getPersonTribe(ps) === 'levi') leviAssignedToOtherValidSlot++;
+    }
+  }
+  check('12b. Halachic "נתפרדה החבילה" (Shulchan Aruch OC 135:6): when NO Kohen is present, a Levi is NEVER assigned to Aliyah #2 after a Yisrael across all 54 parashot, while still participating in Aliyah #1 or Aliyot 3-7',
+    leviAfterYisraelViolations === 0 && leviAssignedToOtherValidSlot > 0,
+    \`violations=\${leviAfterYisraelViolations}, validLeviSlots=\${leviAssignedToOtherValidSlot}\`);
+
+  // 12c. Back-button overlay closer & exit confirmation state
+  resetCleanState();
+  STATE.editingCongregant = 'new';
+  const closedModal = closeAnyOpenOverlay();
+  check('12c. closeAnyOpenOverlay() closes an open modal before triggering exit confirmation',
+    closedModal === true && STATE.editingCongregant === null);
+}
+
 console.log('\\n======================================================');
 console.log(\`SUMMARY: \${passed} passed, \${failed} failed\`);
 console.log('======================================================\\n');
