@@ -181,6 +181,57 @@ option{font-weight:600; color:var(--ink); background:#fff; padding:4px;}
   padding:2px 10px; border-radius:20px; font-weight:800;
 }
 .panel select{margin-top:10px; font-size:13.5px; padding:8px 8px; white-space:normal; font-weight:700;}
+.panel select.sr-only-select{display:none;}
+.rich-select-trigger{
+  margin-top:10px; width:100%; padding:9px 11px; border-radius:10px;
+  border:1.5px solid var(--line); background:#fff; color:var(--ink);
+  font-family:'Assistant',sans-serif; cursor:pointer; text-align:right;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+.rich-select-trigger:hover{border-color:var(--gold); background:#FFFCF5;}
+.rich-select-trigger:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px rgba(194,155,86,0.18);}
+.rich-select-trigger .rst-main{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;}
+.rich-select-trigger .rst-name{font-weight:800; font-size:15.5px; color:var(--ink); line-height:1.25; word-break:break-word;}
+.rich-select-trigger .rst-meta{font-weight:400; font-size:12px; color:var(--ink-soft); line-height:1.2;}
+.rich-select-trigger .rst-placeholder{font-weight:600; font-size:13.5px; color:var(--ink-soft);}
+.rich-select-trigger .rst-arrow{font-size:12px; color:var(--gold-deep); flex-shrink:0;}
+
+.rich-select-backdrop{
+  position:fixed; inset:0; z-index:190; background:rgba(29,39,66,0.18);
+}
+.rich-select-menu{
+  position:fixed; z-index:200; background:#FFFEFA; border:1.5px solid var(--gold);
+  border-radius:14px; box-shadow:0 18px 48px rgba(29,39,66,0.26);
+  width:min(360px, calc(100vw - 24px)); max-height:min(440px, 78vh);
+  display:flex; flex-direction:column; overflow:hidden; direction:rtl; text-align:right;
+  animation:modalPopIn .14s ease;
+}
+.rsm-search-wrap{
+  padding:10px 12px; border-bottom:1px solid var(--line); background:#FAF4E6;
+}
+.rsm-search-wrap input{
+  width:100%; padding:8px 10px; font-size:13.5px; border-radius:8px; border:1px solid var(--line); background:#fff;
+}
+.rsm-list{overflow-y:auto; flex:1; padding:6px 0;}
+.rsm-group-title{
+  padding:7px 14px 4px; font-size:11.5px; font-weight:800; color:var(--gold-deep);
+  background:#F7EFE0; border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  position:sticky; top:0; z-index:1;
+}
+.rsm-option{
+  width:100%; border:none; background:transparent; padding:9px 14px;
+  text-align:right; font-family:'Assistant',sans-serif; cursor:pointer;
+  display:flex; flex-direction:column; gap:2px; border-bottom:1px solid rgba(226,214,190,0.45);
+  transition:background .1s;
+}
+.rsm-option:hover:not(:disabled){background:#F5ECD6;}
+.rsm-option.is-selected{background:#EFE3C6;}
+.rsm-option:disabled{opacity:0.48; cursor:not-allowed; background:rgba(0,0,0,0.02);}
+.rsm-opt-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%;}
+.rsm-opt-name{font-weight:800; font-size:15.5px; color:var(--ink);}
+.rsm-opt-meta{font-weight:400; font-size:12.5px; color:var(--ink-soft);}
+.rsm-opt-status{font-weight:400; font-size:11.5px; color:var(--warn); line-height:1.3;}
 .panel input[type=text]{font-size:13px;}
 .panel .mismatch{
   font-size:11.5px;color:var(--warn); background:rgba(248,229,223,0.65);
@@ -1937,6 +1988,7 @@ function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(
 // after by matching element id + text-selection range.
 let lastRenderedTab = null;
 function render(){
+  if(typeof closeRichSelectMenu === 'function') closeRichSelectMenu();
   const app = document.getElementById('app');
   if(!STATE.loaded){ app.innerHTML = `<div class="empty-state">טוען...</div>`; return; }
 
@@ -2160,7 +2212,7 @@ function buildWeekPanelsReadOnly(parashaName, assignObj, reasons){
       const link = whatsappLinkForPerson(person, parashaName, ALIYAH_NAMES[i-1]);
       waHtml = link
         ? `<a class="btn btn-outline btn-sm" href="${link}" target="_blank" style="margin-top:8px;display:inline-block;">📱 שלח לו</a>`
-        : `<div class="mini" style="margin-top:8px;">אין טלפון שמור</div>`;
+        : `<button type="button" class="btn btn-outline btn-sm" data-addphone="${person.id}" style="margin-top:8px;">📱 + הוסף טלפון</button>`;
     }
     const state = assignedId ? 'filled' : 'empty';
     html += `
@@ -2200,7 +2252,8 @@ function buildSmartSelectOptions(parashaName, pesukim, aliyahIdx, assignedId, as
     else if(isRecentWarn) statusSuffix = ' — קרא לפני 2 שבתות';
     else if(!isFit) statusSuffix = pesukim > c.level ? ' — מעל הטווח' : ' — מתחת לטווח';
 
-    const optHtml = `<option value="${c.id}" ${assignedId===c.id?'selected':''} ${heldElsewhere?'disabled':''}>${escHtml(c.name)} (${capText} · ${totalText})${statusSuffix}</option>`;
+    const cleanStatus = statusSuffix.replace(/^\s*—\s*/, '');
+    const optHtml = `<option value="${c.id}" data-name="${escHtml(c.name)}" data-meta="${escHtml(capText + ' · ' + totalText)}" data-status="${escHtml(cleanStatus)}" ${assignedId===c.id?'selected':''} ${heldElsewhere?'disabled':''}>${escHtml(c.name)} (${capText} · ${totalText})${statusSuffix}</option>`;
 
     if(heldElsewhere || c.paused || isIronBlocked){
       blocked.push(optHtml);
@@ -2263,17 +2316,31 @@ function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings, opts)
     const recencyNote = recencyWarnings[i] || recencyWarnings[String(i)] || '';
     const state = !assignedId ? 'empty' : (mismatch || isDuplicate || recencyNote) ? 'warning' : 'filled';
     const optionsHtml = buildSmartSelectOptions(parashaName, pesukim, i, assignedId, assignedAliyahOf, statsMap);
+    let triggerInnerHtml = '';
+    if(isGuest){
+      triggerInnerHtml = `<span class="rst-main"><strong class="rst-name">👤 אורח (שם מותאם)</strong></span>`;
+    } else if(person){
+      const st = statsMap[person.id] || {total:0};
+      const metaStr = person.isDeleted ? '' : `${person.unrestricted ? 'קורא חזק' : `עד ${person.level}`} · ${st.total} עליות`;
+      triggerInnerHtml = `<span class="rst-main"><strong class="rst-name">${escHtml(person.name)}</strong>${metaStr ? `<span class="rst-meta">${escHtml(metaStr)}</span>` : ''}</span>`;
+    } else {
+      triggerInnerHtml = `<span class="rst-main"><span class="rst-placeholder">${isLockMode ? '— ללא נעילה —' : '— לא שובץ —'}</span></span>`;
+    }
     html += `
       <div class="panel" data-state="${state}">
         ${isLockedSlot && !isLockMode ? `<div class="lock-badge" title="ננעל ידנית מראש">🔒 נעול מראש</div>` : ''}
         <div class="seal"><div class="heb-letter">${HEB_LETTERS[i-1]}</div></div>
         <div class="aliyah-name">עולה ${ALIYAH_NAMES[i-1]}</div>
         <div class="pesukim">${pesukim} פסוקים</div>
-        <select data-aliyah="${i}">
-          <option value="">${isLockMode ? '— ללא נעילה —' : '— לא שובץ —'}</option>
+        <button type="button" class="rich-select-trigger" data-rich-trigger="${i}">
+          ${triggerInnerHtml}
+          <span class="rst-arrow">▾</span>
+        </button>
+        <select data-aliyah="${i}" class="sr-only-select">
+          <option value="" data-name="${isLockMode ? '— ללא נעילה —' : '— לא שובץ —'}">${isLockMode ? '— ללא נעילה —' : '— לא שובץ —'}</option>
           ${optionsHtml}
-          ${(person && person.isDeleted) ? `<option value="${escHtml(assignedId)}" selected>${escHtml(person.name)}</option>` : ''}
-          <option value="guest" ${isGuest?'selected':''}>👤 אורח (שם מותאם)</option>
+          ${(person && person.isDeleted) ? `<option value="${escHtml(assignedId)}" data-name="${escHtml(person.name)}" selected>${escHtml(person.name)}</option>` : ''}
+          <option value="guest" data-name="👤 אורח (שם מותאם)" ${isGuest?'selected':''}>👤 אורח (שם מותאם)</option>
         </select>
         ${isGuest ? `<input type="text" data-guestname="${i}" placeholder="שם האורח" value="${escHtml(guestName)}" style="margin-top:6px;font-size:13px;padding:6px 8px;">` : ''}
         ${(!isLockMode && (allowSuggest || (person && !isGuest))) ? `<div class="panel-actions-row">
@@ -2282,7 +2349,7 @@ function buildWeekPanels(parashaName, assignObj, reasons, recencyWarnings, opts)
             const link = whatsappLinkForPerson(person, parashaName, ALIYAH_NAMES[i-1]);
             return link
               ? `<a class="btn ${isSent ? 'btn-wa-sent' : 'btn-outline'} btn-sm" data-wasend="${i}" href="${link}" target="_blank">${isSent ? '✓ נשלח (שלח שוב)' : '📱 שלח לו'}</a>`
-              : `<div class="mini" style="margin-top:4px;width:100%;">אין טלפון שמור</div>`;
+              : `<button type="button" class="btn btn-outline btn-sm" data-addphone="${person.id}" title="הוסף מספר טלפון למתפלל כדי לשלוח לו בוואטסאפ">📱 + הוסף טלפון</button>`;
           })() : ''}
         </div>` : ''}
         ${mismatch ? `<div class="mismatch">${mismatch}</div>`:''}
@@ -2747,7 +2814,7 @@ function renderPeopleTab(){
       <tr><th>שם</th><th>טווח פסוקים מקסימלי</th><th>סה"כ עליות</th><th>עלייה אחרונה</th><th></th></tr>
       ${filtered.map(({c, stats})=>`
         <tr style="${c.paused?'opacity:0.55;':''}">
-          <td class="name-cell">${c.name}${c.paused?` <span class="pill pill-warn">מושהה</span>`:''}</td>
+          <td class="name-cell">${escHtml(c.name)}${c.paused?` <span class="pill pill-warn">מושהה</span>`:''}${c.phone?` <span class="mini" title="טלפון שמור: ${escHtml(c.phone)}">📱</span>`:''}</td>
           <td>${c.unrestricted ? `<span class="pill pill-good">קורא חזק</span>` : `<span class="pill pill-gold">עד ${c.level}</span>`}</td>
           <td><span class="pill pill-muted">${stats.total}</span>${imbalanceFlagFor(c, stats, avgNormal, normalTotals.length)}</td>
           <td class="mini">${lastReadCellFor(c, stats)}</td>
@@ -2765,7 +2832,7 @@ function renderPeopleTab(){
       ${filtered.map(({c, stats})=>`
         <div class="person-card ${c.paused?'paused':''}">
           <div class="pc-top">
-            <div class="pc-name">${c.name}${c.paused?` <span class="pill pill-warn">מושהה</span>`:''}</div>
+            <div class="pc-name">${escHtml(c.name)}${c.paused?` <span class="pill pill-warn">מושהה</span>`:''}${c.phone?` <span class="mini" title="טלפון שמור: ${escHtml(c.phone)}">📱</span>`:''}</div>
             ${c.unrestricted ? `<span class="pill pill-good">קורא חזק</span>` : `<span class="pill pill-gold">עד ${c.level}</span>`}
           </div>
           <div class="pc-stats"><span class="pill pill-muted">${stats.total} עליות</span>${imbalanceFlagFor(c, stats, avgNormal, normalTotals.length)}<br>${lastReadCellFor(c, stats)}</div>
@@ -2861,27 +2928,11 @@ function renderCongregantModal(){
         <div class="note">המתפלל יקבל רק עליות בטווח ${STATE.matchSettings.lower}%–${STATE.matchSettings.upper}% מהמספר הזה.</div>
       </div>
       <div class="field">
-        <label>מספר טלפון (רשות - לשליחת וואטסאפ)</label>
+        <label>מספר טלפון (רשות - לשליחת וואטסאפ אישית בלחיצת כפתור)</label>
         <input type="text" id="f-phone" value="${escHtml(person.phone||'')}" placeholder="050-1234567" dir="ltr" style="text-align:left;">
         <button type="button" class="btn btn-outline btn-sm" id="pickContactBtn" style="margin-top:8px;width:100%;">📇 בחר מאנשי קשר</button>
       </div>
-      ${isNew ? `
-      <div class="note">אופציונלי: אם ידוע לך על עלייה אחרונה ספציפית (כולל תאריך), אפשר לתעד אותה כאן — היא תופיע בהיסטוריה שלו.</div>
-      <div class="row-flex">
-        <div class="field"><label>תאריך</label><input type="date" id="f-lastDate"></div>
-        <div class="field"><label>פרשה</label>
-          <select id="f-lastParasha">
-            <option value="">— אין —</option>
-            ${PARASHOT_DEFAULT_TOTALS.map(p=>`<option value="${p[0]}">${p[0]}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field"><label>עלייה</label>
-          <select id="f-lastAliyah">
-            <option value="">—</option>
-            ${ALIYAH_NAMES.map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}
-          </select>
-        </div>
-      </div>` : ''}
+      ${isNew ? `<div class="note">לאחר הוספת המתפלל לרשימה, תוכל לשבץ אותו בטאב "שיבוץ השבוע" או לתעד עליות עבר בטאב "עליות אחרונות".</div>` : ''}
       <div class="modal-actions">
         <button class="btn btn-outline" id="cancelModal">ביטול</button>
         <button class="btn btn-gold" id="saveModal">שמירה</button>
@@ -2889,6 +2940,11 @@ function renderCongregantModal(){
     </div>
   `;
   setTimeout(()=>{
+    if(STATE.focusPhoneOnEdit){
+      STATE.focusPhoneOnEdit = false;
+      const ph = backdrop.querySelector('#f-phone');
+      if(ph && typeof ph.focus==='function') ph.focus();
+    }
     backdrop.querySelector('#f-unrestricted').onchange = (e)=>{
       backdrop.querySelector('#levelField').style.display = e.target.checked ? 'none' : '';
     };
@@ -2920,24 +2976,9 @@ function renderCongregantModal(){
       if(isNew){
         const newId = 'c'+Math.random().toString(36).slice(2,9);
         STATE.congregants.push({ id:newId, name, level, baseTotal:0, unrestricted, phone });
-        const lastParasha = document.getElementById('f-lastParasha').value;
-        const lastAliyah = document.getElementById('f-lastAliyah').value;
-        const lastDate = document.getElementById('f-lastDate').value;
-        if(lastParasha && lastAliyah){
-          STATE.weeklyLog.push({
-            id: genId(),
-            date: lastDate || '',
-            parasha: lastParasha,
-            assign: { [lastAliyah]: newId },
-            deferred: []
-          });
-          saveWeeklyLog();
-        }
       }else{
         const p = STATE.congregants.find(c=>c.id===STATE.editingCongregant);
         p.name=name; p.level=level; p.unrestricted=unrestricted; p.phone=phone;
-        // baseTotal is intentionally left untouched here - total reads come only from
-        // actual weeklyLog entries (past-week backfill or ongoing confirmed assignments)
       }
       saveCongregants();
       STATE.editingCongregant=null;
@@ -3433,6 +3474,157 @@ function renderParashaModal(){
     };
   },0);
   return backdrop;
+}
+
+// ---------- Rich Dropdown Menu (Bold Congregant Names) & Quick Phone Add ----------
+let activeRichMenuEl = null;
+let activeRichBackdropEl = null;
+
+function closeRichSelectMenu(){
+  if(activeRichMenuEl && activeRichMenuEl.parentNode) activeRichMenuEl.parentNode.removeChild(activeRichMenuEl);
+  if(activeRichBackdropEl && activeRichBackdropEl.parentNode) activeRichBackdropEl.parentNode.removeChild(activeRichBackdropEl);
+  activeRichMenuEl = null;
+  activeRichBackdropEl = null;
+}
+
+function openRichSelectMenu(triggerBtn, selectEl){
+  closeRichSelectMenu();
+  if(!selectEl) return;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'rich-select-backdrop';
+  backdrop.onclick = closeRichSelectMenu;
+
+  const menu = document.createElement('div');
+  menu.className = 'rich-select-menu';
+
+  const currentVal = selectEl.value;
+  const buildListHtml = (filterQuery) => {
+    const q = (filterQuery || '').trim();
+    let html = '';
+    const renderOptButton = (opt) => {
+      const val = opt.getAttribute('value') || '';
+      const name = opt.getAttribute('data-name') || opt.textContent || '';
+      const meta = opt.getAttribute('data-meta') || '';
+      const status = opt.getAttribute('data-status') || '';
+      if(q && val !== '' && val !== 'guest' && !name.includes(q)) return '';
+      const isSelected = val === currentVal;
+      const isDisabled = opt.hasAttribute('disabled');
+      return `<button type="button" class="rsm-option ${isSelected?'is-selected':''}" data-opt-val="${escHtml(val)}" ${isDisabled?'disabled':''}>
+        <div class="rsm-opt-top">
+          <strong class="rsm-opt-name">${escHtml(name)}</strong>
+          ${meta ? `<span class="rsm-opt-meta">${escHtml(meta)}</span>` : ''}
+        </div>
+        ${status ? `<div class="rsm-opt-status">${escHtml(status)}</div>` : ''}
+      </button>`;
+    };
+
+    for(const child of Array.from(selectEl.children)){
+      if(child.tagName === 'OPTGROUP'){
+        const groupLabel = child.getAttribute('label') || '';
+        const optsHtml = Array.from(child.children).map(renderOptButton).filter(Boolean).join('');
+        if(optsHtml){
+          html += `<div class="rsm-group-title">${escHtml(groupLabel)}</div>${optsHtml}`;
+        }
+      } else if(child.tagName === 'OPTION'){
+        html += renderOptButton(child);
+      }
+    }
+    return html || `<div class="empty-state" style="padding:18px;">לא נמצא מתפלל בשם "${escHtml(q)}"</div>`;
+  };
+
+  menu.innerHTML = `
+    <div class="rsm-search-wrap">
+      <input type="text" placeholder="🔍 חיפוש מהיר לפי שם מתפלל..." id="rsmSearchInput">
+    </div>
+    <div class="rsm-list" id="rsmListContainer">${buildListHtml('')}</div>
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(menu);
+  activeRichBackdropEl = backdrop;
+  activeRichMenuEl = menu;
+
+  // Position anchored to triggerBtn (or centered on narrow mobile screens)
+  if(typeof triggerBtn.getBoundingClientRect === 'function' && typeof window.innerWidth === 'number'){
+    const rect = triggerBtn.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if(vw <= 600){
+      menu.style.left = '12px';
+      menu.style.right = '12px';
+      menu.style.width = 'auto';
+      menu.style.top = Math.max(20, Math.min(vh - 440, rect.bottom + 6)) + 'px';
+    } else {
+      const menuW = 350;
+      let left = rect.right - menuW;
+      if(left < 12) left = 12;
+      if(left + menuW > vw - 12) left = vw - menuW - 12;
+      menu.style.left = left + 'px';
+      menu.style.width = menuW + 'px';
+      const spaceBelow = vh - rect.bottom - 16;
+      if(spaceBelow >= 280 || rect.top < 280){
+        menu.style.top = (rect.bottom + 6) + 'px';
+        menu.style.maxHeight = Math.max(200, Math.min(440, spaceBelow)) + 'px';
+      } else {
+        const maxH = Math.min(420, rect.top - 16);
+        menu.style.maxHeight = maxH + 'px';
+        menu.style.top = Math.max(12, rect.top - maxH - 6) + 'px';
+      }
+    }
+  }
+
+  const listContainer = menu.querySelector('#rsmListContainer');
+  const wireOptionClicks = () => {
+    listContainer.querySelectorAll('.rsm-option').forEach(btn=>{
+      btn.onclick = ()=>{
+        if(btn.disabled) return;
+        const val = btn.getAttribute('data-opt-val');
+        closeRichSelectMenu();
+        selectEl.value = val;
+        if(typeof selectEl.onchange === 'function'){
+          selectEl.onchange({ target: selectEl });
+        }
+      };
+    });
+  };
+  wireOptionClicks();
+
+  const searchInp = menu.querySelector('#rsmSearchInput');
+  if(searchInp){
+    searchInp.oninput = ()=>{
+      listContainer.innerHTML = buildListHtml(searchInp.value);
+      wireOptionClicks();
+    };
+    if(typeof window.innerWidth === 'number' && window.innerWidth > 640){
+      setTimeout(()=>{ try{ searchInp.focus(); }catch(e){} }, 20);
+    }
+  }
+}
+
+if(typeof document !== 'undefined' && typeof document.addEventListener === 'function'){
+  document.addEventListener('click', (e)=>{
+    const triggerBtn = e.target && e.target.closest ? e.target.closest('[data-rich-trigger]') : null;
+    if(triggerBtn){
+      e.preventDefault();
+      const panel = triggerBtn.closest('.panel');
+      const selectEl = panel ? panel.querySelector('select[data-aliyah]') : null;
+      if(selectEl) openRichSelectMenu(triggerBtn, selectEl);
+      return;
+    }
+    const addPhoneBtn = e.target && e.target.closest ? e.target.closest('[data-addphone]') : null;
+    if(addPhoneBtn){
+      e.preventDefault();
+      const pid = addPhoneBtn.getAttribute('data-addphone');
+      if(pid && STATE.congregants.some(c=>c.id===pid)){
+        STATE.editingCongregant = pid;
+        STATE.focusPhoneOnEdit = true;
+        render();
+      }
+    }
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && activeRichMenuEl) closeRichSelectMenu();
+  });
 }
 
 loadAll();
