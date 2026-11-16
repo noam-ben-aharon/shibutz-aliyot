@@ -613,7 +613,9 @@ console.log('\\n--- 12. Kohen / Levi Halachic Rules ("נתפרדה החבילה"
     enRenderOk = false;
   }
   STATE.lang = 'he';
-  check('12g. English language mode (STATE.lang = "en") renders cleanly across Auth screen and all tabs', enRenderOk);
+  const translatedFooter = translateSubstringInText('קיבלת קוד שיתוף מגבאי אחר?');
+  check('12g. English language mode (STATE.lang = "en") renders cleanly and never corrupts Hebrew words containing parasha substrings (like "בא" in "מגבאי")',
+    enRenderOk && translatedFooter === 'Have a share code from another Gabbai?' && !translatedFooter.includes('Bo'));
 }
 
 console.log('\\n======================================================');

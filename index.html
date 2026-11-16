@@ -5462,15 +5462,13 @@ function translateSubstringInText(str){
   if(EXACT_EN_MAP[trimmed]) return s.replace(trimmed, EXACT_EN_MAP[trimmed]);
   if(PARASHA_EN_MAP[trimmed]) return s.replace(trimmed, PARASHA_EN_MAP[trimmed]);
 
-  // Replace known parasha names inside composite strings before pattern replacements
-  const sortedParashot = Object.keys(PARASHA_EN_MAP).sort((a,b)=>b.length - a.length);
-  for(const hebP of sortedParashot){
-    if(s.includes(hebP)){
-      s = s.split(hebP).join(PARASHA_EN_MAP[hebP]);
-    }
+  // Check if string is "<Parasha> (DD/MM/YYYY)" in <select id="parashaSelect">
+  const optDateMatch = trimmed.match(/^(.+?)\s+(\(\d{2}\/\d{2}\/\d{4}\))$/);
+  if(optDateMatch && PARASHA_EN_MAP[optDateMatch[1].trim()]){
+    return s.replace(trimmed, `${PARASHA_EN_MAP[optDateMatch[1].trim()]} ${optDateMatch[2]}`);
   }
 
-  // Common dynamic patterns
+  // 1. Run phrase and pattern translations FIRST (before any parasha name replacements)
   s = s.replace(/🟢 ענן מסונכרן/g, '🟢 Cloud Synced')
        .replace(/🔄 מסנכרן\.\.\./g, '🔄 Syncing...')
        .replace(/👤 מחובר/g, '👤 Connected')
@@ -5505,7 +5503,6 @@ function translateSubstringInText(str){
        .replace(/✓ נבחר — /g, '✓ Selected — ')
        .replace(/עובר לסוף התור/g, 'Moves to end of queue')
        .replace(/לאחרונה:/g, 'Last read:')
-       .replace(/פרשת /g, 'Parashat ')
        .replace(/שיבוץ עליות — /g, 'Aliyah Assignment — ')
        .replace(/הכי הרבה:/g, 'Highest:')
        .replace(/הכי מעט:/g, 'Lowest:')
@@ -5518,6 +5515,19 @@ function translateSubstringInText(str){
        .replace(/שיתוף וסנכרון גבאים — /g, 'Co-Gabbai Cloud Sync — ')
        .replace(/היסטוריית עליות — /g, 'Aliyah History — ')
        .replace(/עריכת חלוקת פסוקים — /g, 'Edit Verse Split — ');
+
+  // 2. Replace parasha names ONLY in explicit Parasha contexts (never inside regular Hebrew words!)
+  const sortedParashot = Object.keys(PARASHA_EN_MAP).sort((a,b)=>b.length - a.length);
+  for(const hebP of sortedParashot){
+    const enP = PARASHA_EN_MAP[hebP];
+    if(s.includes(`פרשת ${hebP}`)) s = s.split(`פרשת ${hebP}`).join(`Parashat ${enP}`);
+    if(s.includes(`בפרשת ${hebP}`)) s = s.split(`בפרשת ${hebP}`).join(`in Parashat ${enP}`);
+    if(s.includes(`Aliyah Assignment — ${hebP}`)) s = s.split(`Aliyah Assignment — ${hebP}`).join(`Aliyah Assignment — ${enP}`);
+    if(s.includes(`Edit Verse Split — ${hebP}`)) s = s.split(`Edit Verse Split — ${hebP}`).join(`Edit Verse Split — ${enP}`);
+    if(s.includes(`Open Draft: ${hebP}`)) s = s.split(`Open Draft: ${hebP}`).join(`Open Draft: ${enP}`);
+    if(s.includes(`· ${hebP},`)) s = s.split(`· ${hebP},`).join(`· ${enP},`);
+  }
+  s = s.replace(/פרשת /g, 'Parashat ');
   return s;
 }
 
