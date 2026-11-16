@@ -4447,6 +4447,57 @@ function scheduleCloudPush(){
   }, 350);
 }
 
+// When a device that was used locally before cloud setup (e.g. your father's phone) connects
+// to the shared synagogue (`NETZACH`) for the first time, ensure its pre-existing local data
+// (confirmed weeks, saved phone numbers, tribe tags, new congregants, open draft) is merged
+// into the cloud rather than overwritten by a blank cloud document!
+function mergeLocalIntoRemoteOnFirstConnect(remoteData){
+  if(!remoteData) return { merged: buildCurrentShulPayload(), didEnrich: true };
+  let didEnrich = false;
+  const rCongs = Array.isArray(remoteData.congregants) ? JSON.parse(JSON.stringify(remoteData.congregants)) : [];
+  const rLog = Array.isArray(remoteData.weeklyLog) ? JSON.parse(JSON.stringify(remoteData.weeklyLog)) : [];
+
+  // 1. Merge congregant fields (phone, tribe, paused) and any locally added congregants
+  for(const locC of (STATE.congregants || [])){
+    const match = rCongs.find(rc => rc.id === locC.id || rc.name === locC.name);
+    if(match){
+      if(locC.phone && !match.phone){ match.phone = locC.phone; didEnrich = true; }
+      if(locC.tribe && locC.tribe !== 'israel' && (!match.tribe || match.tribe === 'israel')){ match.tribe = locC.tribe; didEnrich = true; }
+    } else if(remoteData.shulId === 'NETZACH' || !remoteData.shulId){
+      rCongs.push(JSON.parse(JSON.stringify(locC)));
+      didEnrich = true;
+    }
+  }
+
+  // 2. Merge confirmed weeklyLog entries that exist locally but not yet in remoteData
+  for(const locW of (STATE.weeklyLog || [])){
+    const exists = rLog.some(rw => rw.id === locW.id || (rw.parasha === locW.parasha && rw.date === locW.date));
+    if(!exists){
+      rLog.push(JSON.parse(JSON.stringify(locW)));
+      didEnrich = true;
+    }
+  }
+
+  // 3. Preserve open draft if cloud has none
+  let mergedCurrent = remoteData.current;
+  if(!mergedCurrent && STATE.current){
+    mergedCurrent = JSON.parse(JSON.stringify(STATE.current));
+    didEnrich = true;
+  }
+
+  return {
+    merged: {
+      ...remoteData,
+      congregants: rCongs,
+      weeklyLog: rLog,
+      current: mergedCurrent,
+      updatedAt: didEnrich ? new Date().toISOString() : remoteData.updatedAt
+    },
+    didEnrich
+  };
+}
+
+let hasPerformedInitialCloudMerge = false;
 async function subscribeToCloudShul(shulId){
   if(activeShulUnsubscribe){
     try{ activeShulUnsubscribe(); }catch(e){}
@@ -4460,8 +4511,19 @@ async function subscribeToCloudShul(shulId){
     STATE.cloudSyncStatus = 'online';
     if(snap.exists()){
       const remoteData = snap.data();
-      await applyShulSnapshotToState(remoteData);
+      if(!hasPerformedInitialCloudMerge && shulId === 'NETZACH'){
+        hasPerformedInitialCloudMerge = true;
+        const { merged, didEnrich } = mergeLocalIntoRemoteOnFirstConnect(remoteData);
+        await applyShulSnapshotToState(merged);
+        if(didEnrich){
+          await fbModules.setDoc(shulRef, buildCurrentShulPayload(), { merge: true });
+        }
+      } else {
+        hasPerformedInitialCloudMerge = true;
+        await applyShulSnapshotToState(remoteData);
+      }
     } else {
+      hasPerformedInitialCloudMerge = true;
       // First time this shulId is created in cloud -> push our local state up!
       await fbModules.setDoc(shulRef, buildCurrentShulPayload());
       render();
@@ -5095,7 +5157,16 @@ async function finalizeAuthenticatedSession(user, mode, backdrop, showInlineAler
     const remoteData = snap.data();
     shulId = code;
     shulName = remoteData.synagogueName || 'בית כנסת';
-    await applyShulSnapshotToState(remoteData);
+    if(code === 'NETZACH'){
+      const { merged, didEnrich } = mergeLocalIntoRemoteOnFirstConnect(remoteData);
+      hasPerformedInitialCloudMerge = true;
+      await applyShulSnapshotToState(merged);
+      if(didEnrich){
+        await fbModules.setDoc(shulRef, buildCurrentShulPayload(), { merge: true });
+      }
+    } else {
+      await applyShulSnapshotToState(remoteData);
+    }
     await fbModules.setDoc(fbModules.doc(fbDb, 'users', user.uid), {
       email: user.email || '',
       displayName,

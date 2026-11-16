@@ -617,6 +617,26 @@ console.log('\\n--- 12. Kohen / Levi Halachic Rules ("נתפרדה החבילה"
   const uncorruptedWord = translateSubstringInText('מילה עם בא באמצע');
   check('12g. English language mode (STATE.lang = "en") renders cleanly and never corrupts Hebrew words containing parasha substrings',
     enRenderOk && translatedFooter === 'Have a share code for an existing synagogue?' && !uncorruptedWord.includes('Bo'));
+
+  // 12h. mergeLocalIntoRemoteOnFirstConnect preserves father's existing local weeklyLog & phones when connecting to NETZACH
+  resetCleanState();
+  STATE.congregants[0].phone = '050-9998888';
+  STATE.congregants[0].tribe = 'kohen';
+  STATE.weeklyLog.push({ id: 'w_father_1', date: '2026-11-14', parasha: 'תולדות', assign: { 1: 'c1' }, deferred: [] });
+  const emptyRemoteNetzach = {
+    shulId: 'NETZACH',
+    synagogueName: 'בית כנסת נצח בנים',
+    congregants: seedData().congregants,
+    weeklyLog: [],
+    current: null
+  };
+  const mergeRes = mergeLocalIntoRemoteOnFirstConnect(emptyRemoteNetzach);
+  check('12h. mergeLocalIntoRemoteOnFirstConnect preserves pre-existing local weeklyLog, phone numbers, and tribe tags when joining NETZACH',
+    mergeRes.didEnrich === true &&
+    mergeRes.merged.weeklyLog.length === 1 &&
+    mergeRes.merged.weeklyLog[0].id === 'w_father_1' &&
+    mergeRes.merged.congregants[0].phone === '050-9998888' &&
+    mergeRes.merged.congregants[0].tribe === 'kohen');
 }
 
 console.log('\\n======================================================');

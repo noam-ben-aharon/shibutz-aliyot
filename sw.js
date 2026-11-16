@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shibutz-aliyot-v8';
+const CACHE_NAME = 'shibutz-aliyot-v9';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (event) => {
