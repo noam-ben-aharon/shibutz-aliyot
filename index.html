@@ -4421,50 +4421,50 @@ async function handleLogout(){
 }
 
 function renderAuthModal(isFullPageGate){
-  const mode = STATE.authModal || (STATE.pendingJoinCode ? 'join' : 'login');
+  const initialMode = STATE.authModal || (STATE.pendingJoinCode ? 'join' : 'login');
   const hasCloudCfg = !!getStoredFirebaseConfig();
   const backdrop = el(isFullPageGate ? `<div></div>` : `<div class="modal-backdrop"></div>`);
   const closeBtnHtml = isFullPageGate ? '' : `<button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>`;
 
-  let formHtml = '';
-  const googleBtnHtml = `
-    <button type="button" class="btn-google" id="authGoogleBtn">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-      <span>${mode==='register' ? 'הירשם מהר באמצעות Google' : 'התחבר באמצעות Google'}</span>
-    </button>
-    <div class="auth-divider">או באמצעות אימייל וסיסמה</div>
-  `;
-
-  if(mode === 'login'){
-    formHtml = `
-      ${googleBtnHtml}
-      <div class="field"><label>אימייל או שם משתמש</label><input type="email" id="authEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
-      <div class="field"><label>סיסמה</label><input type="password" id="authPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
-      <div class="modal-actions" style="margin-top:16px;">
-        ${closeBtnHtml}
-        <button type="button" class="btn btn-gold" id="submitLoginBtn" style="flex:1;">🔑 התחבר למערכת</button>
-      </div>
+  const buildFormHtmlForMode = (mode) => {
+    const googleBtnHtml = `
+      <button type="button" class="btn-google" id="authGoogleBtn">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        <span>${mode==='register' ? 'הירשם מהר באמצעות Google' : 'התחבר באמצעות Google'}</span>
+      </button>
+      <div class="auth-divider">או באמצעות אימייל וסיסמה</div>
     `;
-  } else if(mode === 'register'){
-    formHtml = `
-      <div class="field"><label>שם בית הכנסת</label><input type="text" id="regShulName" placeholder="למשל: בית כנסת אהבת שלום" value=""></div>
-      <div class="field"><label>שם הגבאי</label><input type="text" id="regGabbaiName" placeholder="למשל: משה כהן"></div>
-      <div class="field">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
-          <input type="checkbox" id="regKeepCurrentData" style="width:auto;">
-          שמור את רשימת המתפללים הקיימת במכשיר זה (סמן רק עבור "בית כנסת נצח בנים"; לבית כנסת חדש השאר לא מסומן כדי להתחיל מרשימה ריקה)
-        </label>
-      </div>
-      ${googleBtnHtml}
-      <div class="field"><label>אימייל</label><input type="email" id="regEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
-      <div class="field"><label>סיסמה (לפחות 6 תווים)</label><input type="password" id="regPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
-      <div class="modal-actions" style="margin-top:16px;">
-        ${closeBtnHtml}
-        <button type="button" class="btn btn-gold" id="submitRegBtn" style="flex:1;">✨ צור חשבון בית כנסת</button>
-      </div>
-    `;
-  } else if(mode === 'join'){
-    formHtml = `
+    if(mode === 'login'){
+      return `
+        ${googleBtnHtml}
+        <div class="field"><label>אימייל או שם משתמש</label><input type="email" id="authEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
+        <div class="field"><label>סיסמה</label><input type="password" id="authPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
+        <div class="modal-actions" style="margin-top:16px;">
+          ${closeBtnHtml}
+          <button type="button" class="btn btn-gold" id="submitLoginBtn" style="flex:1;">🔑 התחבר למערכת</button>
+        </div>
+      `;
+    }
+    if(mode === 'register'){
+      return `
+        <div class="field"><label>שם בית הכנסת</label><input type="text" id="regShulName" placeholder="למשל: בית כנסת אהבת שלום" value=""></div>
+        <div class="field"><label>שם הגבאי</label><input type="text" id="regGabbaiName" placeholder="למשל: משה כהן"></div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
+            <input type="checkbox" id="regKeepCurrentData" style="width:auto;">
+            שמור את רשימת המתפללים הקיימת במכשיר זה (סמן רק עבור "בית כנסת נצח בנים"; לבית כנסת חדש השאר לא מסומן כדי להתחיל מרשימה ריקה)
+          </label>
+        </div>
+        ${googleBtnHtml}
+        <div class="field"><label>אימייל</label><input type="email" id="regEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
+        <div class="field"><label>סיסמה (לפחות 6 תווים)</label><input type="password" id="regPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
+        <div class="modal-actions" style="margin-top:16px;">
+          ${closeBtnHtml}
+          <button type="button" class="btn btn-gold" id="submitRegBtn" style="flex:1;">✨ צור חשבון בית כנסת</button>
+        </div>
+      `;
+    }
+    return `
       <div class="note" style="margin-top:0;">כדי להסתנכרן עם גבאי אחר (למשל בין אבא שלך לבינך), הזן את <b>קוד השיתוף בן 6 התווים</b> של בית הכנסת והתחבר:</div>
       <div class="field" style="margin-top:10px;"><label>קוד שיתוף גבאים (6 תווים)</label><input type="text" id="joinShulCode" placeholder="למשל: NETZACH" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:18px;text-transform:uppercase;"></div>
       <div class="field"><label>השם שלך (גבאי שותף)</label><input type="text" id="joinGabbaiName" placeholder="למשל: אבא / גבאי"></div>
@@ -4476,7 +4476,7 @@ function renderAuthModal(isFullPageGate){
         <button type="button" class="btn btn-gold" id="submitJoinBtn" style="flex:1;">🤝 התחבר והסתנכרן</button>
       </div>
     `;
-  }
+  };
 
   const gateHeaderHtml = isFullPageGate ? `
     <div style="text-align:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line);">
@@ -4507,50 +4507,27 @@ function renderAuthModal(isFullPageGate){
       ${gateHeaderHtml}
       <div class="note" style="margin-top:0;margin-bottom:14px;text-align:center;">יש להתחבר לחשבון בית הכנסת כדי לצפות ולנהל את המתפללים והשיבוצים.</div>
       <div class="auth-tabs">
-        <button type="button" class="auth-tab-btn ${mode==='login'?'active':''}" data-auth-tab="login">🔑 התחברות</button>
-        <button type="button" class="auth-tab-btn ${mode==='register'?'active':''}" data-auth-tab="register">✨ הרשמה (חדש)</button>
-        <button type="button" class="auth-tab-btn ${mode==='join'?'active':''}" data-auth-tab="join">🤝 הצטרפות עם קוד</button>
+        <button type="button" class="auth-tab-btn ${initialMode==='login'?'active':''}" data-auth-tab="login">🔑 התחברות</button>
+        <button type="button" class="auth-tab-btn ${initialMode==='register'?'active':''}" data-auth-tab="register">✨ הרשמה (חדש)</button>
+        <button type="button" class="auth-tab-btn ${initialMode==='join'?'active':''}" data-auth-tab="join">🤝 הצטרפות עם קוד</button>
       </div>
-      ${formHtml}
-      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-        <span class="mini">${hasCloudCfg ? '🟢 מחובר לענן המאובטח של Google Firebase' : '⚙ סנכרון בין מכשירים דורש חיבור Firebase'}</span>
-        <button type="button" class="btn btn-outline btn-sm" id="openCloudConfigFromAuth">☁️ הגדרות ענן</button>
-      </div>
+      <div id="authFormContainer" style="transition:opacity .15s ease;">${buildFormHtmlForMode(initialMode)}</div>
     </div>
   `;
 
-  setTimeout(()=>{
-    backdrop.querySelectorAll('[data-auth-tab]').forEach(btn=>{
-      btn.onclick = ()=>{
-        STATE.authModal = btn.getAttribute('data-auth-tab');
-        render();
-      };
-    });
+  const wireAuthFormHandlers = (activeMode) => {
     const closeBtn = backdrop.querySelector('#closeAuthModal');
     if(closeBtn) closeBtn.onclick = ()=>{ STATE.authModal = null; render(); };
 
-    const cfgBtn = backdrop.querySelector('#openCloudConfigFromAuth');
-    if(cfgBtn) cfgBtn.onclick = ()=>{
-      STATE.authModal = null;
-      STATE.cloudConfigModal = true;
-      render();
-    };
-
     const googleBtn = backdrop.querySelector('#authGoogleBtn');
     if(googleBtn) googleBtn.onclick = async ()=>{
-      if(!hasCloudCfg){
-        STATE.authModal = null;
-        STATE.cloudConfigModal = true;
-        render();
-        return;
-      }
       const ok = await ensureFirebaseLoaded();
-      if(!ok){ notice('לא ניתן לטעון את חיבור Google כרגע. בדוק את החיבור לאינטרנט ואת הגדרות ה-Firebase.'); return; }
+      if(!ok){ notice('לא ניתן לטעון את חיבור Google כרגע. בדוק את החיבור לאינטרנט.'); return; }
       try{
         const provider = new fbModules.GoogleAuthProvider();
         const res = await fbModules.signInWithPopup(fbAuth, provider);
         const user = res.user;
-        await finalizeAuthenticatedSession(user, mode, backdrop);
+        await finalizeAuthenticatedSession(user, activeMode, backdrop);
       }catch(e){
         notice('ההתחברות עם Google לא הושלמה: ' + (e && e.message ? e.message : 'שגיאה'));
       }
@@ -4571,7 +4548,6 @@ function renderAuthModal(isFullPageGate){
           return;
         }
       }
-      // Local multi-synagogue login
       const users = getLocalUsersRegistry();
       const u = users[email];
       if(!u || u.pass !== pass){
@@ -4606,9 +4582,7 @@ function renderAuthModal(isFullPageGate){
           return;
         }
       }
-      // Local multi-synagogue registration
       const shulId = keepData && shulName === 'בית כנסת נצח בנים' ? 'NETZACH' : generateShulShareCode();
-      // Save current shul before switching
       if(STATE.shulId){
         const reg = getLocalShulsRegistry();
         reg[STATE.shulId] = buildCurrentShulPayload();
@@ -4663,7 +4637,7 @@ function renderAuthModal(isFullPageGate){
       }
       const shuls = getLocalShulsRegistry();
       if(!shuls[code]){
-        notice('לחיבור בין שני מכשירים שונים (למשל הטלפון של אבא שלך והמחשב שלך), יש לחבר תחילה את שרת הענן (כפתור "☁️ חבר שרת Firebase" למטה).');
+        notice('לא נמצא בית כנסת עם קוד השיתוף שהוזן.');
         return;
       }
       await applyShulSnapshotToState(shuls[code]);
@@ -4676,6 +4650,26 @@ function renderAuthModal(isFullPageGate){
       render();
       notice(`התחברת בהצלחה ל-${STATE.synagogueName}!`);
     };
+  };
+
+  setTimeout(()=>{
+    backdrop.querySelectorAll('[data-auth-tab]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const nextMode = btn.getAttribute('data-auth-tab');
+        STATE.authModal = nextMode;
+        backdrop.querySelectorAll('[data-auth-tab]').forEach(b=>b.classList.toggle('active', b===btn));
+        const formContainer = backdrop.querySelector('#authFormContainer');
+        if(formContainer){
+          formContainer.style.opacity = '0';
+          setTimeout(()=>{
+            formContainer.innerHTML = buildFormHtmlForMode(nextMode);
+            wireAuthFormHandlers(nextMode);
+            formContainer.style.opacity = '1';
+          }, 90);
+        }
+      };
+    });
+    wireAuthFormHandlers(initialMode);
   },0);
 
   return backdrop;
