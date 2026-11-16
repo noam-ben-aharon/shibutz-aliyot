@@ -4155,8 +4155,15 @@ function closeAnyOpenOverlay(){
 }
 
 // ---------- Multi-Synagogue Authentication, Registration, Google Sign-In & Cloud Sync ----------
-// Can be pre-configured here for all devices on GitHub Pages, or pasted once in the Cloud Setup modal:
-const DEFAULT_FIREBASE_CONFIG = null;
+// Pre-configured for shibutz-aliyot Firebase project so all devices connect automatically:
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBMMJ_WkWdzARvXhj4B85GUOHqYomgVWwQ",
+  authDomain: "shibutz-aliyot.firebaseapp.com",
+  projectId: "shibutz-aliyot",
+  storageBucket: "shibutz-aliyot.firebasestorage.app",
+  messagingSenderId: "190911817951",
+  appId: "1:190911817951:web:2b42bba54e723dbbae216a"
+};
 
 let fbApp = null;
 let fbAuth = null;
