@@ -2317,6 +2317,28 @@ function render(){
   const selStart = hasSelectionRange ? activeEl.selectionStart : null;
   const selEnd = hasSelectionRange ? activeEl.selectionEnd : null;
 
+  // Full-Screen Login / Registration Gate:
+  // Do NOT show the synagogue home screen, tabs, or data until the user is logged in!
+  if(!STATE.authUser){
+    app.innerHTML = `<div id="authGateContainer" style="max-width:500px;margin:28px auto;"></div>`;
+    const gateContainer = document.getElementById('authGateContainer');
+    gateContainer.appendChild(renderAuthModal(true));
+    if(STATE.confirmModal!==null) app.appendChild(renderConfirmModal());
+    if(STATE.noticeModal!==null) app.appendChild(renderNoticeModal());
+    if(STATE.cloudConfigModal) app.appendChild(renderCloudConfigModal());
+    if(STATE.exitConfirmModal) app.appendChild(renderExitConfirmModal());
+    if(focusId){
+      const toFocus = document.getElementById(focusId);
+      if(toFocus && typeof toFocus.focus==='function'){
+        toFocus.focus();
+        if(selStart!=null && 'setSelectionRange' in toFocus){
+          try{ toFocus.setSelectionRange(selStart, selEnd); }catch(e){}
+        }
+      }
+    }
+    return;
+  }
+
   const isTabSwitch = STATE.tab !== lastRenderedTab;
   lastRenderedTab = STATE.tab;
 
@@ -4359,27 +4381,19 @@ async function initCloudSyncIfConfigured(){
     try{
       const userRef = fbModules.doc(fbDb, 'users', user.uid);
       const userSnap = await fbModules.getDoc(userRef);
-      let shulId = STATE.shulId || 'netzach-banim';
-      let synagogueName = STATE.synagogueName || 'בית כנסת נצח בנים';
-      if(userSnap.exists()){
-        const uData = userSnap.data();
-        if(uData.shulId) shulId = uData.shulId;
-        if(uData.synagogueName) synagogueName = uData.synagogueName;
-      } else {
-        await fbModules.setDoc(userRef, {
-          email: user.email || '',
-          displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי'),
-          shulId,
-          synagogueName,
-          updatedAt: new Date().toISOString()
-        });
+      if(!userSnap.exists()){
+        // User signed in via popup/redirect and is being handled by finalizeAuthenticatedSession
+        return;
       }
+      const uData = userSnap.data();
+      const shulId = uData.shulId || 'NETZACH';
+      const synagogueName = uData.synagogueName || 'בית כנסת נצח בנים';
       STATE.shulId = shulId;
       STATE.synagogueName = synagogueName;
       STATE.authUser = {
         uid: user.uid,
         email: user.email || '',
-        displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי'),
+        displayName: uData.displayName || user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי'),
         shulId,
         synagogueName,
         mode: 'cloud'
@@ -4406,10 +4420,11 @@ async function handleLogout(){
   render();
 }
 
-function renderAuthModal(){
-  const mode = STATE.authModal || 'login';
+function renderAuthModal(isFullPageGate){
+  const mode = STATE.authModal || (STATE.pendingJoinCode ? 'join' : 'login');
   const hasCloudCfg = !!getStoredFirebaseConfig();
-  const backdrop = el(`<div class="modal-backdrop"></div>`);
+  const backdrop = el(isFullPageGate ? `<div></div>` : `<div class="modal-backdrop"></div>`);
+  const closeBtnHtml = isFullPageGate ? '' : `<button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>`;
 
   let formHtml = '';
   const googleBtnHtml = `
@@ -4426,47 +4441,71 @@ function renderAuthModal(){
       <div class="field"><label>אימייל או שם משתמש</label><input type="email" id="authEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
       <div class="field"><label>סיסמה</label><input type="password" id="authPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
       <div class="modal-actions" style="margin-top:16px;">
-        <button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>
-        <button type="button" class="btn btn-gold" id="submitLoginBtn">🔑 התחבר למערכת</button>
+        ${closeBtnHtml}
+        <button type="button" class="btn btn-gold" id="submitLoginBtn" style="flex:1;">🔑 התחבר למערכת</button>
       </div>
     `;
   } else if(mode === 'register'){
     formHtml = `
-      <div class="field"><label>שם בית הכנסת</label><input type="text" id="regShulName" placeholder="למשל: בית כנסת נצח בנים" value="${escHtml(STATE.synagogueName || '')}"></div>
-      <div class="field"><label>שם הגבאי</label><input type="text" id="regGabbaiName" placeholder="למשל: נעם בן אהרון"></div>
+      <div class="field"><label>שם בית הכנסת</label><input type="text" id="regShulName" placeholder="למשל: בית כנסת אהבת שלום" value=""></div>
+      <div class="field"><label>שם הגבאי</label><input type="text" id="regGabbaiName" placeholder="למשל: משה כהן"></div>
       <div class="field">
         <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
-          <input type="checkbox" id="regKeepCurrentData" style="width:auto;" ${STATE.synagogueName==='בית כנסת נצח בנים' ? 'checked' : ''}>
-          שמור את רשימת המתפללים וההיסטוריה הקיימים כרגע במכשיר זה (מתאים להקמת "נצח בנים"; עבור בית כנסת חדש — בטל סימון כדי להתחיל מרשימה ריקה)
+          <input type="checkbox" id="regKeepCurrentData" style="width:auto;">
+          שמור את רשימת המתפללים הקיימת במכשיר זה (סמן רק עבור "בית כנסת נצח בנים"; לבית כנסת חדש השאר לא מסומן כדי להתחיל מרשימה ריקה)
         </label>
       </div>
       ${googleBtnHtml}
       <div class="field"><label>אימייל</label><input type="email" id="regEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
       <div class="field"><label>סיסמה (לפחות 6 תווים)</label><input type="password" id="regPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
       <div class="modal-actions" style="margin-top:16px;">
-        <button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>
-        <button type="button" class="btn btn-gold" id="submitRegBtn">✨ צור חשבון בית כנסת</button>
+        ${closeBtnHtml}
+        <button type="button" class="btn btn-gold" id="submitRegBtn" style="flex:1;">✨ צור חשבון בית כנסת</button>
       </div>
     `;
   } else if(mode === 'join'){
     formHtml = `
       <div class="note" style="margin-top:0;">כדי להסתנכרן עם גבאי אחר (למשל בין אבא שלך לבינך), הזן את <b>קוד השיתוף בן 6 התווים</b> של בית הכנסת והתחבר:</div>
-      <div class="field" style="margin-top:10px;"><label>קוד שיתוף גבאים (6 תווים)</label><input type="text" id="joinShulCode" placeholder="למשל: NB2026" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:18px;text-transform:uppercase;"></div>
+      <div class="field" style="margin-top:10px;"><label>קוד שיתוף גבאים (6 תווים)</label><input type="text" id="joinShulCode" placeholder="למשל: NETZACH" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:18px;text-transform:uppercase;"></div>
       <div class="field"><label>השם שלך (גבאי שותף)</label><input type="text" id="joinGabbaiName" placeholder="למשל: אבא / גבאי"></div>
       ${googleBtnHtml}
       <div class="field"><label>אימייל</label><input type="email" id="joinEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
       <div class="field"><label>סיסמה (לפחות 6 תווים)</label><input type="password" id="joinPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
       <div class="modal-actions" style="margin-top:16px;">
-        <button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>
-        <button type="button" class="btn btn-gold" id="submitJoinBtn">🤝 התחבר והסתנכרן</button>
+        ${closeBtnHtml}
+        <button type="button" class="btn btn-gold" id="submitJoinBtn" style="flex:1;">🤝 התחבר והסתנכרן</button>
       </div>
     `;
   }
 
+  const gateHeaderHtml = isFullPageGate ? `
+    <div style="text-align:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line);">
+      <div style="display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px;">
+        <svg width="54" height="54" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="rodGate" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#C7A05C"/>
+              <stop offset="1" stop-color="#8F6B2E"/>
+            </linearGradient>
+          </defs>
+          <rect x="6" y="7" width="7" height="32" rx="3.5" fill="url(#rodGate)"/>
+          <rect x="33" y="7" width="7" height="32" rx="3.5" fill="url(#rodGate)"/>
+          <rect x="12" y="14" width="22" height="18" rx="2" fill="#FBF6E9"/>
+          <line x1="16" y1="19" x2="30" y2="19" stroke="#7C3F34" stroke-width="1.4"/>
+          <line x1="16" y1="23" x2="30" y2="23" stroke="#7C3F34" stroke-width="1.4"/>
+          <line x1="16" y1="27" x2="24" y2="27" stroke="#7C3F34" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <div class="eyebrow" style="font-size:12.5px;">מערכת ניהול גבאים</div>
+      <h1 style="font-size:28px;margin-top:2px;">שיבוץ עליות לתורה</h1>
+      <div class="subtitle">חלוקה הוגנת, חכמה ומסונכרנת לכל שבת</div>
+    </div>
+  ` : `<h3 style="margin-bottom:6px;">🔐 כניסת גבאים וסנכרון ענן</h3>`;
+
   backdrop.innerHTML = `
-    <div class="modal" style="max-width:480px;">
-      <h3 style="margin-bottom:6px;">🔐 כניסת גבאים וסנכרון ענן</h3>
-      <div class="note" style="margin-top:0;margin-bottom:12px;">התחבר לחשבון בית הכנסת כדי לסנכרן נתונים בין מכשירים (למשל בינך לבין אבא שלך), או פתח חשבון חדש ונפרד לבית כנסת אחר.</div>
+    <div class="${isFullPageGate ? 'card' : 'modal'}" style="${isFullPageGate ? 'max-width:500px;margin:0 auto;padding:28px 26px;' : 'max-width:480px;'}">
+      ${gateHeaderHtml}
+      <div class="note" style="margin-top:0;margin-bottom:14px;text-align:center;">יש להתחבר לחשבון בית הכנסת כדי לצפות ולנהל את המתפללים והשיבוצים.</div>
       <div class="auth-tabs">
         <button type="button" class="auth-tab-btn ${mode==='login'?'active':''}" data-auth-tab="login">🔑 התחברות</button>
         <button type="button" class="auth-tab-btn ${mode==='register'?'active':''}" data-auth-tab="register">✨ הרשמה (חדש)</button>
@@ -4474,8 +4513,8 @@ function renderAuthModal(){
       </div>
       ${formHtml}
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-        <span class="mini">${hasCloudCfg ? '🟢 שרת ענן Firebase מוגדר ופעיל' : '⚙ סנכרון בין מכשירים דורש חיבור Firebase (חינמי, דקה אחת)'}</span>
-        <button type="button" class="btn btn-outline btn-sm" id="openCloudConfigFromAuth">☁️ ${hasCloudCfg ? 'הגדרות שרת ענן' : 'חבר שרת Firebase'}</button>
+        <span class="mini">${hasCloudCfg ? '🟢 מחובר לענן המאובטח של Google Firebase' : '⚙ סנכרון בין מכשירים דורש חיבור Firebase'}</span>
+        <button type="button" class="btn btn-outline btn-sm" id="openCloudConfigFromAuth">☁️ הגדרות ענן</button>
       </div>
     </div>
   `;
@@ -4705,14 +4744,28 @@ async function finalizeAuthenticatedSession(user, mode, backdrop){
       shulName = uData.synagogueName || STATE.synagogueName;
       if(uData.displayName) displayName = uData.displayName;
     } else {
-      shulId = STATE.shulId && STATE.shulId !== 'netzach-banim' ? STATE.shulId : 'NETZACH';
-      await fbModules.setDoc(userRef, {
-        email: user.email || '',
-        displayName,
-        shulId,
-        synagogueName: shulName,
-        updatedAt: new Date().toISOString()
-      });
+      // First-time Google Sign-In on the Login tab:
+      // Check if NETZACH has been claimed yet. If NOT, this is the primary owner (Noam) claiming NETZACH!
+      // If NETZACH already exists in Firestore, do NOT let a random stranger into NETZACH without an invite code;
+      // direct them to either Register a new synagogue or Join with an invite code!
+      const netzachRef = fbModules.doc(fbDb, 'shuls', 'NETZACH');
+      const netzachSnap = await fbModules.getDoc(netzachRef);
+      if(!netzachSnap.exists()){
+        shulId = 'NETZACH';
+        shulName = 'בית כנסת נצח בנים';
+        await fbModules.setDoc(userRef, {
+          email: user.email || '',
+          displayName,
+          shulId,
+          synagogueName: shulName,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        STATE.authModal = STATE.pendingJoinCode ? 'join' : 'register';
+        render();
+        notice('זהו חיבור ראשון לחשבון Google זה — אנא בחר "הרשמה (חדש)" כדי להקים בית כנסת משלך, או "הצטרפות עם קוד" אם קיבלת קוד שיתוף גבאים.');
+        return;
+      }
     }
   }
 

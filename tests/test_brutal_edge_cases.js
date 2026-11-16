@@ -94,6 +94,7 @@ function resetCleanState() {
   STATE.matchSettings = { lower: 65, upper: 130, strongMin: 30 };
   STATE.whatsappTemplate = null;
   STATE.loaded = true;
+  STATE.authUser = { uid: 'test-gabbai', email: 'test@shul.org', displayName: 'גבאי בדיקה', shulId: 'NETZACH', synagogueName: 'בית כנסת נצח בנים', mode: 'local' };
   invalidateStatsCache();
 }
 
@@ -588,6 +589,13 @@ console.log('\\n--- 12. Kohen / Levi Halachic Rules ("נתפרדה החבילה"
   render();
   STATE.shareModal = false;
   check('12e. Multi-synagogue Auth, Registration, Co-Gabbai Join, and Share modals render cleanly', true);
+
+  // 12f. Full-Screen Auth Gate hides home screen when not logged in (!STATE.authUser)
+  STATE.authUser = null;
+  render();
+  const appHtmlWhenLoggedOut = document.getElementById('app').innerHTML || '';
+  check('12f. When not logged in (!STATE.authUser), render() displays ONLY the Auth Gate and hides navigation tabs/home screen',
+    appHtmlWhenLoggedOut.includes('authGateContainer') && !appHtmlWhenLoggedOut.includes('nav class="tabs"'));
 }
 
 console.log('\\n======================================================');
