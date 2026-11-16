@@ -826,7 +826,8 @@ let STATE = {
   authModal:null,         // null | 'login' | 'register' | 'join'
   shareModal:false,       // true when the co-gabbai share code modal is open
   cloudConfigModal:false, // true when the Firebase config setup modal is open
-  cloudSyncStatus:'local' // 'local' | 'connecting' | 'online' | 'syncing' | 'error'
+  cloudSyncStatus:'local', // 'local' | 'connecting' | 'online' | 'syncing' | 'error'
+  lang:'he'               // 'he' | 'en' - full UI language switcher
 };
 
 // ---------- Kohen / Levi / Yisrael halachic helpers ----------
@@ -1216,6 +1217,11 @@ async function loadAll(){
   try{
     const au = await Store.get('authUser');
     if(au && au.value) STATE.authUser = JSON.parse(au.value);
+  }catch(e){}
+
+  try{
+    const lg = await Store.get('lang');
+    if(lg && (lg.value === 'en' || lg.value === 'he')) STATE.lang = lg.value;
   }catch(e){}
 
   // Check if URL has ?join=SHUL_CODE for 1-click Co-Gabbai invite
@@ -2397,6 +2403,13 @@ function render(){
   const selStart = hasSelectionRange ? activeEl.selectionStart : null;
   const selEnd = hasSelectionRange ? activeEl.selectionEnd : null;
 
+  // Apply document direction and language attribute (RTL for Hebrew, LTR for English)
+  if(typeof document !== 'undefined' && document.documentElement){
+    const isEn = STATE.lang === 'en';
+    document.documentElement.lang = isEn ? 'en' : 'he';
+    document.documentElement.dir = isEn ? 'ltr' : 'rtl';
+  }
+
   // Full-Screen Login / Registration Gate:
   // Do NOT show the synagogue home screen, tabs, or data until the user is logged in!
   if(!STATE.authUser){
@@ -2407,6 +2420,7 @@ function render(){
     if(STATE.noticeModal!==null) app.appendChild(renderNoticeModal());
     if(STATE.cloudConfigModal) app.appendChild(renderCloudConfigModal());
     if(STATE.exitConfirmModal) app.appendChild(renderExitConfirmModal());
+    if(STATE.lang === 'en' && typeof translateDomToEnglish === 'function') translateDomToEnglish(app);
     if(focusId){
       const toFocus = document.getElementById(focusId);
       if(toFocus && typeof toFocus.focus==='function'){
@@ -2447,7 +2461,7 @@ function render(){
           <div class="subtitle">חלוקה הוגנת ומותאמת אישית לכל שבת</div>
           <div class="account-bar">
             ${STATE.authUser ? `
-              <button type="button" class="cloud-status-pill ${STATE.cloudSyncStatus==='online'?'online':STATE.cloudSyncStatus==='syncing'?'syncing':''}" id="openShareModalBtn" title="לחץ לצפייה בקוד השיתוף לגבאי נוסף (למשל אבא שלך)">
+              <button type="button" class="cloud-status-pill ${STATE.cloudSyncStatus==='online'?'online':STATE.cloudSyncStatus==='syncing'?'syncing':''}" id="openShareModalBtn" title="לחץ לצפייה בקוד השיתוף לגבאי נוסף">
                 ${STATE.cloudSyncStatus==='online' ? '🟢 ענן מסונכרן' : STATE.cloudSyncStatus==='syncing' ? '🔄 מסנכרן...' : '👤 מחובר'} · ${escHtml(STATE.authUser.displayName || STATE.authUser.email)}
               </button>
               <button type="button" class="cloud-status-pill" id="openCoGabbaiBtn">🤝 שיתוף גבאי</button>
@@ -2455,6 +2469,7 @@ function render(){
             ` : `
               <button type="button" class="cloud-status-pill" id="openAuthModalBtn">🔐 כניסת גבאי / הרשמה (סנכרון ענן)</button>
             `}
+            <button type="button" class="cloud-status-pill" id="toggleLangBtn" title="החלף שפה / Switch Language">🌐 ${STATE.lang==='en' ? 'עברית' : 'English'}</button>
             ${typeof deferredInstallPrompt !== 'undefined' && deferredInstallPrompt ? `<button type="button" class="install-app-btn" id="installPwaBtn">📲 התקן כאפליקציה</button>` : ''}
           </div>
         </div>
@@ -2469,6 +2484,8 @@ function render(){
     </header>
     <div id="content"></div>
   `;
+  const langBtn = document.getElementById('toggleLangBtn');
+  if(langBtn) langBtn.onclick = ()=>{ if(typeof toggleLanguage === 'function') toggleLanguage(); };
   const installBtn = document.getElementById('installPwaBtn');
   if(installBtn){
     installBtn.onclick = async ()=>{
@@ -2510,6 +2527,10 @@ function render(){
   if(STATE.authModal!==null) content.appendChild(renderAuthModal());
   if(STATE.shareModal) content.appendChild(renderShareModal());
   if(STATE.cloudConfigModal) content.appendChild(renderCloudConfigModal());
+
+  if(STATE.lang === 'en' && typeof translateDomToEnglish === 'function'){
+    translateDomToEnglish(app);
+  }
 
   if(focusId){
     const toFocus = document.getElementById(focusId);
@@ -3063,7 +3084,7 @@ function renderRecentTab(){
   intro.innerHTML = `<h2>ארכיון עליות</h2>
     <div class="note">כל השבתות שאושרו, מהחדשה לישנה. לחיצה על שבת פותחת את פרטי השיבוץ שלה, ולחיצה נוספת סוגרת בחזרה — כדי שהעמוד לא יהיה עמוס. לעריכה, יש ללחוץ "✏️ עריכת שיבוץ" בתוך הבלוק הפתוח (מיועד לתיקון טעויות או שינוי של הרגע האחרון, לא לשינויים שגרתיים).</div>
     <div class="row-flex" style="margin-top:12px;">
-      <div><label>חיפוש (פרשה או תאריך)</label><input type="text" id="recentSearchInput" placeholder="למשל: ואתחנן, או 20/07" value="${escHtml(STATE.recentSearch||'')}"></div>
+      <div><label>חיפוש (פרשה או תאריך)</label><input type="text" id="recentSearchInput" placeholder="הזן שם פרשה או תאריך" value="${escHtml(STATE.recentSearch||'')}"></div>
     </div>
     <div style="margin-top:12px;"><button class="btn btn-outline btn-sm" id="addManualWeekBtn">+ הוסף שבת עבר ידנית</button></div>
     <div class="note">שימושי כדי להזין שבתות שכבר התקיימו לפני שהתחלת להשתמש באתר — כך שהסבב ההוגן ייקח אותן בחשבון קדימה.</div>`;
@@ -4119,6 +4140,7 @@ function openRichSelectMenu(triggerBtn, selectEl){
   document.body.appendChild(menu);
   activeRichBackdropEl = backdrop;
   activeRichMenuEl = menu;
+  if(STATE.lang === 'en' && typeof translateDomToEnglish === 'function') translateDomToEnglish(menu);
 
   // Position anchored to triggerBtn (or centered on narrow mobile screens)
   if(typeof triggerBtn.getBoundingClientRect === 'function' && typeof window.innerWidth === 'number'){
@@ -4524,13 +4546,13 @@ function renderAuthModal(isFullPageGate){
         <div id="authInlineAlert" class="auth-inline-alert"></div>
         <div class="field">
           <label>אפשרות א': הקמת בית כנסת חדש</label>
-          <input type="text" id="onboardShulName" placeholder="שם בית הכנסת (למשל: בית כנסת אהבת שלום)">
+          <input type="text" id="onboardShulName" placeholder="הזן את שם בית הכנסת">
           <button type="button" class="btn btn-gold" id="onboardCreateShulBtn" style="width:100%;margin-top:8px;">✨ הקם בית כנסת חדש והיכנס</button>
         </div>
         <div class="auth-divider">או הצטרף לבית כנסת קיים</div>
         <div class="field">
           <label>אפשרות ב': הצטרפות כגבאי שותף (עם קוד שיתוף)</label>
-          <input type="text" id="onboardJoinCode" placeholder="קוד שיתוף (למשל: NETZACH)" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:17px;text-transform:uppercase;">
+          <input type="text" id="onboardJoinCode" placeholder="הזן קוד שיתוף גבאים" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:17px;text-transform:uppercase;">
           <button type="button" class="btn btn-ink" id="onboardJoinShulBtn" style="width:100%;margin-top:8px;">🤝 התחבר לבית הכנסת והסתנכרן</button>
         </div>
       `;
@@ -4569,11 +4591,11 @@ function renderAuthModal(isFullPageGate){
         ${googleBtnHtml}
         <div class="field">
           <label>שם בית הכנסת</label>
-          <input type="text" id="regShulName" placeholder="למשל: בית כנסת אהבת שלום" value="">
+          <input type="text" id="regShulName" placeholder="הזן את שם בית הכנסת" value="">
         </div>
         <div class="field">
           <label>שם מלא (גבאי)</label>
-          <input type="text" id="regGabbaiName" placeholder="למשל: משה כהן" autocomplete="name">
+          <input type="text" id="regGabbaiName" placeholder="הזן שם מלא" autocomplete="name">
         </div>
         <div class="field">
           <label>כתובת אימייל</label>
@@ -4587,7 +4609,7 @@ function renderAuthModal(isFullPageGate){
           </div>
         </div>
         <div class="modal-actions" style="margin-top:18px;">
-          <button type="button" class="btn btn-gold" id="submitRegBtn" style="flex:1;padding:12px;font-size:15px;">✨ צור חשבון בית כנסת</button>
+          <button type="button" class="btn btn-gold" id="submitRegBtn" style="flex:1;padding:12px;font-size:15px;">✨ הרשמה</button>
         </div>
         <div class="auth-footer-switch">
           מצטרף כגבאי נוסף לבית כנסת קיים? <button type="button" class="auth-link-btn" data-switch-mode="join">🤝 הזן קוד שיתוף</button>
@@ -4599,16 +4621,16 @@ function renderAuthModal(isFullPageGate){
     return `
       <div id="authInlineAlert" class="auth-inline-alert"></div>
       <div class="note" style="margin-top:0;margin-bottom:12px;background:#FAF3E3;padding:10px 12px;border-radius:10px;border:1px solid var(--line);color:var(--ink);">
-        🤝 <b>הצטרפות כגבאי שותף:</b> הזן את קוד השיתוף שקיבלת מהגבאי הראשי (למשל <b>NETZACH</b>) והתחבר עם Google או אימייל.
+        🤝 <b>הצטרפות כגבאי שותף:</b> הזן את קוד השיתוף שקיבלת מהגבאי הראשי והתחבר עם Google או אימייל.
       </div>
       <div class="field">
         <label>קוד שיתוף בית הכנסת</label>
-        <input type="text" id="joinShulCode" placeholder="למשל: NETZACH" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:18px;text-transform:uppercase;">
+        <input type="text" id="joinShulCode" placeholder="הזן קוד שיתוף" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:18px;text-transform:uppercase;">
       </div>
       ${googleBtnHtml}
       <div class="field">
         <label>השם שלך</label>
-        <input type="text" id="joinGabbaiName" placeholder="למשל: אבא / גבאי">
+        <input type="text" id="joinGabbaiName" placeholder="הזן שם מלא">
       </div>
       <div class="field">
         <label>כתובת אימייל</label>
@@ -4634,7 +4656,10 @@ function renderAuthModal(isFullPageGate){
     <div class="auth-shell">
       <div class="auth-showcase">
         <div>
-          <div class="auth-showcase-badge">✨ מערכת ניהול גבאים חכמה</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <div class="auth-showcase-badge">✨ מערכת ניהול גבאים חכמה</div>
+            <button type="button" class="cloud-status-pill" id="authLangToggleBtn" style="background:rgba(255,255,255,0.12);color:#FBF6E9;border-color:rgba(194,155,86,0.45);">🌐 ${STATE.lang==='en' ? 'עברית' : 'English'}</button>
+          </div>
           <div style="margin-top:22px;display:flex;align-items:center;gap:14px;">
             <svg width="52" height="52" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 4px 10px rgba(0,0,0,0.3));flex-shrink:0;">
               <defs>
@@ -4684,8 +4709,8 @@ function renderAuthModal(isFullPageGate){
       </div>
       <div class="auth-form-col">
         <div class="auth-tabs" id="authTopTabs" style="${(initialMode==='join'||initialMode==='onboarding')?'display:none;':''}">
-          <button type="button" class="auth-tab-btn ${initialMode==='login'?'active':''}" data-auth-tab="login">התחברות לחשבון</button>
-          <button type="button" class="auth-tab-btn ${initialMode==='register'?'active':''}" data-auth-tab="register">פתיחת בית כנסת חדש</button>
+          <button type="button" class="auth-tab-btn ${initialMode==='login'?'active':''}" data-auth-tab="login">התחברות</button>
+          <button type="button" class="auth-tab-btn ${initialMode==='register'?'active':''}" data-auth-tab="register">הרשמה</button>
         </div>
         <div id="authFormContainer" style="transition:opacity .14s ease;">${buildFormHtmlForMode(initialMode)}</div>
       </div>
@@ -4697,6 +4722,7 @@ function renderAuthModal(isFullPageGate){
     if(!box){ notice(msg); return; }
     box.className = 'auth-inline-alert ' + (type === 'success' ? 'success' : 'error');
     box.textContent = msg;
+    if(STATE.lang === 'en' && typeof translateDomToEnglish === 'function') translateDomToEnglish(box);
   };
 
   const switchAuthModeSmooth = (nextMode) => {
@@ -4712,10 +4738,14 @@ function renderAuthModal(isFullPageGate){
       setTimeout(()=>{
         formContainer.innerHTML = buildFormHtmlForMode(nextMode);
         wireAuthFormHandlers(nextMode);
+        if(STATE.lang === 'en' && typeof translateDomToEnglish === 'function') translateDomToEnglish(formContainer);
         formContainer.style.opacity = '1';
       }, 85);
     }
   };
+
+  const authLangBtn = backdrop.querySelector('#authLangToggleBtn');
+  if(authLangBtn) authLangBtn.onclick = ()=>{ if(typeof toggleLanguage === 'function') toggleLanguage(); };
 
   const wireAuthFormHandlers = (activeMode) => {
     // Password eye toggle
@@ -5198,6 +5228,330 @@ function renderCloudConfigModal(){
     };
   },0);
   return backdrop;
+}
+
+// ---------- Bilingual Hebrew / English Interface Engine ----------
+const PARASHA_EN_MAP = {
+  "בראשית": "Bereshit", "נח": "Noach", "לך לך": "Lech-Lecha", "וירא": "Vayera",
+  "חיי שרה": "Chayei Sarah", "תולדות": "Toldot", "ויצא": "Vayetzei", "וישלח": "Vayishlach",
+  "וישב": "Vayeshev", "מקץ": "Miketz", "ויגש": "Vayigash", "ויחי": "Vayechi",
+  "שמות": "Shemot", "וארא": "Vaera", "בא": "Bo", "בשלח": "Beshalach",
+  "יתרו": "Yitro", "משפטים": "Mishpatim", "תרומה": "Terumah", "תצוה": "Tetzaveh",
+  "כי תשא": "Ki Tisa", "ויקהל": "Vayakhel", "פקודי": "Pekudei", "ויקרא": "Vayikra",
+  "צו": "Tzav", "שמיני": "Shemini", "תזריע": "Tazria", "מצורע": "Metzora",
+  "אחרי מות": "Acharei Mot", "קדושים": "Kedoshim", "אמור": "Emor", "בהר": "Behar",
+  "בחוקותי": "Bechukotai", "במדבר": "Bamidbar", "נשא": "Nasso", "בהעלותך": "Beha'alotcha",
+  "שלח לך": "Sh'lach", "קורח": "Korach", "חוקת": "Chukat", "בלק": "Balak",
+  "פינחס": "Pinchas", "מטות": "Matot", "מסעי": "Masei", "דברים": "Devarim",
+  "ואתחנן": "Vaetchanan", "עקב": "Eikev", "ראה": "Re'eh", "שופטים": "Shoftim",
+  "כי תצא": "Ki Teitzei", "כי תבוא": "Ki Tavo", "נצבים": "Nitzavim", "וילך": "Vayeilech",
+  "האזינו": "Ha'azinu", "וזאת הברכה": "V'Zot HaBerachah",
+  "ויקהל-פקודי": "Vayakhel-Pekudei", "תזריע-מצורע": "Tazria-Metzora",
+  "אחרי מות-קדושים": "Acharei Mot-Kedoshim", "בהר-בחוקותי": "Behar-Bechukotai",
+  "מטות-מסעי": "Matot-Masei", "נצבים-וילך": "Nitzavim-Vayeilech"
+};
+
+const EXACT_EN_MAP = {
+  // Auth & Onboarding
+  "✨ מערכת ניהול גבאים חכמה": "✨ Smart Gabbai Management System",
+  "שיבוץ עליות לתורה": "Torah Aliyah Scheduler",
+  "חלוקה הוגנת ומסונכרנת לכל שבת": "Fair & Cloud-Synced Assignments Every Shabbat",
+  "חלוקה הוגנת ומותאמת אישית לכל שבת": "Fair & Personalized Aliyah Assignments Every Shabbat",
+  "ניהול שקוף, הלכתי ומדויק של סבב העליות בבית הכנסת — עם התאמה אוטומטית לטווח הפסוקים של כל קורא וסנכרון ענן בזמן אמת בין הגבאים.": "Transparent, halachic, and accurate Torah reading rotation — automatically matched to each congregant's verse capacity and synced in real time across Gabbais.",
+  "אלגוריתם הוגנות והתאמת פסוקים": "Fairness & Verse-Range Algorithm",
+  "שיבוץ אוטומטי לפי תור ההוגנות, יכולת הקריאה וכלל הברזל נגד כפילות שבועית.": "Automatic matching by fairness queue, verse capacity, and consecutive-week protection.",
+  "הלכה ולוח עברי מובנה": "Built-in Halacha & Hebrew Calendar",
+  "תמיכה בכהן ולוי (\"נתפרדה החבילה\"), זיהוי שנה מעוברת ופרשות מחוברות.": "Full Kohen & Levi halachic logic, automatic leap-year detection, and combined parashot.",
+  "סנכרון גבאים חי ושליחה לוואטסאפ": "Live Gabbai Cloud Sync & WhatsApp",
+  "כל שינוי מתעדכן מיד אצל כל גבאי בית הכנסת, כולל שליחת הודעה אישית עם קישור לקריאה.": "Every update syncs instantly across Gabbais, with 1-click personal WhatsApp messages.",
+  "🔒 מאובטח ומסונכרן בענן Google Firebase": "🔒 Secured & Synced via Google Firebase Cloud",
+  "התחברות": "Sign In",
+  "הרשמה": "Sign Up",
+  "✨ הרשמה": "✨ Sign Up",
+  "המשך באמצעות Google": "Continue with Google",
+  "או באמצעות אימייל": "or continue with email",
+  "כתובת אימייל": "Email Address",
+  "סיסמה": "Password",
+  "סיסמה (לפחות 6 תווים)": "Password (min. 6 characters)",
+  "שכחת סיסמה?": "Forgot password?",
+  "התחבר למערכת ←": "Sign In →",
+  "🤝 הצטרף עם קוד שיתוף": "🤝 Join with Share Code",
+  "🤝 הזן קוד שיתוף": "🤝 Enter Share Code",
+  "שם בית הכנסת": "Synagogue Name",
+  "שם מלא (גבאי)": "Full Name (Gabbai)",
+  "השם שלך": "Your Name",
+  "קוד שיתוף בית הכנסת": "Synagogue Share Code",
+  "🤝 התחבר והסתנכרן עכשיו": "🤝 Connect & Sync Now",
+  "→ חזרה למסך ההתחברות הרגיל": "← Back to Sign In",
+  "אפשרות א': הקמת בית כנסת חדש": "Option A: Create a New Synagogue",
+  "✨ הקם בית כנסת חדש והיכנס": "✨ Create Synagogue & Enter",
+  "או הצטרף לבית כנסת קיים": "or join an existing synagogue",
+  "אפשרות ב': הצטרפות כגבאי שותף (עם קוד שיתוף)": "Option B: Join as Co-Gabbai (with Share Code)",
+  "🤝 התחבר לבית הכנסת והסתנכרן": "🤝 Join Synagogue & Sync",
+  "בית כנסת נצח בנים": "Netzach Banim Synagogue",
+
+  // Navigation & Header
+  "🗓️ שיבוץ השבוע": "🗓️ Weekly Assignment",
+  "📖 עליות אחרונות": "📖 Past Aliyot",
+  "👥 מתפללים": "👥 Congregants",
+  "⚖️ תור והוגנות": "⚖️ Queue & Fairness",
+  "⚙️ הגדרות ופרשות": "⚙️ Settings & Parashot",
+  "🤝 שיתוף גבאי": "🤝 Invite Co-Gabbai",
+  "התנתק": "Log Out",
+  "📲 התקן כאפליקציה": "📲 Install App",
+  "🔐 כניסת גבאי / הרשמה (סנכרון ענן)": "🔐 Gabbai Sign In / Sign Up",
+
+  // Weekly Assignment Tab
+  "בחירת פרשת השבוע": "Select Weekly Parasha",
+  "פרשה (מותאם אוטומטית לשנה הנוכחית)": "Parasha (Auto-adjusted for current Hebrew year)",
+  "תאריך השבת": "Shabbat Date",
+  "בצע שיבוץ": "Generate Assignment",
+  "נעילת עלייה מסוימת (רשות)": "Pre-lock Specific Aliyot (Optional)",
+  "נקה נעילות": "Clear Locks",
+  "✓ אשר שיבוץ ועדכן היסטוריה": "✓ Confirm Assignment & Save to History",
+  "📱 שלח לקבוצה": "📱 Share to Group",
+  "📋 העתק כטקסט": "📋 Copy as Text",
+  "🖨️ הדפסה": "🖨️ Print Sheet",
+  "🔍 למה זה ככה?": "🔍 Why This Order?",
+  "איפוס עליות": "Reset Slots",
+  "— ללא נעילה —": "— Unlocked —",
+  "— לא שובץ —": "— Unassigned —",
+  "👤 אורח (שם מותאם)": "👤 Guest (Custom Name)",
+  "🔄 החלף באחר": "🔄 Suggest Next",
+  "✨ הצע מתפלל": "✨ Suggest Reader",
+  "📱 שלח לו": "📱 WhatsApp",
+  "✓ נשלח (שלח שוב)": "✓ Sent (Send Again)",
+  "📱 + הוסף טלפון": "📱 + Add Phone",
+  "🔒 נעול מראש": "🔒 Pre-locked",
+
+  // Past Aliyot Tab
+  "ארכיון עליות": "Confirmed Aliyot Archive",
+  "חיפוש (פרשה או תאריך)": "Search (Parasha or Date)",
+  "+ הוסף שבת עבר ידנית": "+ Add Past Shabbat Manually",
+  "✏️ עריכת שיבוץ": "✏️ Edit Assignment",
+  "✓ סיום עריכה": "✓ Done Editing",
+  "🗑️ מחיקת שבת זו": "🗑️ Delete Shabbat",
+  "עדיין אין שבתות מאושרות": "No Confirmed Shabbats Yet",
+  "אחרי שתאשר שיבוץ בטאב \"שיבוץ השבוע\" הוא יופיע כאן.": "Once you confirm an assignment on the Weekly Assignment tab, it will appear here.",
+
+  // Congregants Tab & Modal
+  "מתפללים": "Congregants",
+  "+ הוסף מתפלל": "+ Add Congregant",
+  "⬇ ייצוא גיבוי": "⬇ Export Backup",
+  "📊 ייצוא היסטוריה ל-CSV": "📊 Export History CSV",
+  "⬆ ייבוא גיבוי": "⬆ Import Backup",
+  "⬆ ייבוא רשימה מ-CSV": "⬆ Import Roster CSV",
+  "חיפוש": "Search",
+  "מיון:": "Sort:",
+  "א-ב": "A–Z",
+  "הכי מזמן שלא קרא": "Longest Since Last Read",
+  "סינון:": "Filter:",
+  "הכל": "All",
+  "קוראים חזקים בלבד": "Strong Readers Only",
+  "מושהים בלבד": "Paused Only",
+  "שם": "Name",
+  "שבט / מעמד": "Tribe / Status",
+  "טווח פסוקים מקסימלי": "Max Verse Capacity",
+  "סה\"כ עליות": "Total Aliyot",
+  "עלייה אחרונה": "Last Aliyah",
+  "היסטוריה": "History",
+  "השהה": "Pause",
+  "הפעל מחדש": "Resume",
+  "עריכה": "Edit",
+  "מחיקה": "Delete",
+  "קורא חזק": "Strong Reader",
+  "מושהה": "Paused",
+  "טרם עלה": "Never Called",
+  "ישראל": "Yisrael",
+  "🖐️ כהן": "🖐️ Kohen",
+  "🏺 לוי": "🏺 Levi",
+  "ישראל ⟳": "Yisrael ⟳",
+  "🖐️ כהן ⟳": "🖐️ Kohen ⟳",
+  "🏺 לוי ⟳": "🏺 Levi ⟳",
+  "הוספת מתפלל": "Add Congregant",
+  "עריכת מתפלל": "Edit Congregant",
+  "שם מלא": "Full Name",
+  "שבט / מעמד הלכתי": "Tribe / Halachic Status",
+  "טווח פסוקים מקסימלי (יכולת)": "Max Verse Capacity",
+  "מספר טלפון (רשות - לשליחת וואטסאפ אישית בלחיצת כפתור)": "Phone Number (Optional — for 1-click personal WhatsApp)",
+  "📇 בחר מאנשי קשר": "📇 Pick from Contacts",
+  "ביטול": "Cancel",
+  "שמירה": "Save",
+  "סגירה": "Close",
+  "אישור": "OK",
+
+  // Queue & Fairness Tab
+  "🔍 תור ההוגנות — מי הבא בתור ולמה?": "🔍 Fairness Queue — Who Is Next & Why?",
+  "מקום": "Rank",
+  "תוצאה": "Status",
+  "קרא בעבר": "Read Previously",
+  "לא התאים": "Skipped",
+  "פנוי לשיבוץ ידני": "Available Manually",
+  "⚖️ מאזן העליות הכולל": "⚖️ Overall Aliyot Balance",
+  "חלוקת העליות המצטברת בין כלל המתפללים הפעילים בבית הכנסת.": "Cumulative aliyah distribution across all active congregants.",
+  "פער": "Spread",
+  "מאוזן היטב": "Well Balanced",
+  "אין עדיין נתונים": "No Data Yet",
+
+  // Settings & Parashot Tab
+  "הגדרות התאמה": "Matching Settings",
+  "אחוז תחתון": "Lower Bound (%)",
+  "אחוז עליון": "Upper Bound (%)",
+  "מינימום פסוקים לקוראים חזקים": "Preferred Min. Verses for Strong Readers",
+  "תבנית הודעת וואטסאפ": "WhatsApp Message Template",
+  "איפוס לברירת המחדל": "Reset to Default",
+  "📜 טבלת 60 הפרשות וחלוקת הפסוקים": "📜 60 Parashot & Verse Splits Table",
+  "לחץ לפתיחה ועריכה ▾": "Click to Expand & Edit ▾",
+  "פרשה": "Parasha",
+  "סה\"כ פסוקים": "Total Verses",
+  "חלוקה לעליות (א-ז)": "Aliyah Split (1–7)",
+  "סטטוס": "Status",
+  "הערות": "Notes",
+  "מאומת ✓": "Verified ✓",
+  "מותאם ידנית": "Custom Split",
+
+  // Exit & Confirm Modals
+  "יציאה מהמערכת?": "Exit Application?",
+  "האם אתה בטוח שברצונך לצאת ממערכת שיבוץ העליות?": "Are you sure you want to exit the Torah Aliyah Scheduler?",
+  "הישאר באפליקציה": "Stay in App",
+  "כן, צא": "Yes, Exit",
+  "אישור פעולה": "Confirm Action",
+  "כן, בצע": "Yes, Proceed",
+  "העתקת השיבוץ": "Copy Assignment Text",
+  "📋 נסה להעתיק": "📋 Copy to Clipboard",
+  "🖨️ הדפס": "🖨️ Print",
+  "📱 שלח קישור התחברות לאבא בוואטסאפ": "📱 Send Co-Gabbai Invite Link via WhatsApp",
+  "עריכת חלוקת פסוקים": "Edit Verse Split",
+  "הזן/י את מספר הפסוקים בכל עלייה לפי החומש הנהוג בבית הכנסת.": "Enter the number of verses for each aliyah according to your synagogue's Chumash.",
+  "הוספת שבת עבר": "Add Past Shabbat",
+  "למילוי שבת שכבר התקיימה לפני תחילת השימוש באתר — כדי שהסבב ההוגן ייקח אותה בחשבון.": "Record a past Shabbat so the fairness rotation takes it into account going forward.",
+  "תאריך": "Date",
+  "קורא חזק (ללא הגבלת טווח — תמיד יקבל את העלייה הארוכה ביותר שנותרה)": "Strong Reader (Unrestricted — prioritized for the longest aliyot of the Parasha)",
+  "כהן משובץ אוטומטית לעליית ראשון, ולוי לעליית שני (רק כשיש כהן בראשון; כשאין כהן — \"נתפרדה החבילה\" ולוי לא ישובץ לשני אחרי ישראל).": "Kohen is automatically assigned to 1st Aliyah, and Levi to 2nd Aliyah (when a Kohen is present; if no Kohen is present, Levi will not be placed on 2nd Aliyah after a Yisrael).",
+  "לאחר הוספת המתפלל לרשימה, תוכל לשבץ אותו בטאב \"שיבוץ השבוע\" או לתעד עליות עבר בטאב \"עליות אחרונות\".": "After adding the congregant, you can assign them on the Weekly Assignment tab or log past aliyot on the Past Aliyot tab.",
+  "אם כבר ידוע מראש שמישהו חייב לקבל עלייה מסוימת (למשל בר מצווה) — בחר אותו כאן לפני \"בצע שיבוץ\". שאר העליות ישובצו הוגן כרגיל סביב הבחירה הזו.": "If someone must receive a specific aliyah this week (e.g., Bar Mitzvah), pre-select them here before generating the assignment. Remaining aliyot will be assigned fairly around it.",
+  "⏰ עדיין לא בוצע שום שיבוץ מאושר. כדאי לבצע שיבוץ לשבת הקרובה.": "⏰ No confirmed assignments yet. Generate an assignment for the upcoming Shabbat below.",
+  "⏳ טרם הורץ שיבוץ לשבת הקרובה": "⏳ No draft generated yet for upcoming Shabbat",
+  "אין עדיין מתפללים": "No Congregants Yet",
+  "אין מתפללים שתואמים את הסינון": "No congregants match the current filter",
+  "הוסף מתפלל כדי להתחיל": "Add a congregant to get started",
+  "אין עלייה שמתאימה לטווח היכולת שלו בשבת הזו.": "No aliyah matches their verse range this Shabbat."
+};
+
+const PLACEHOLDER_EN_MAP = {
+  "הזן את שם בית הכנסת": "Enter synagogue name",
+  "הזן שם מלא": "Enter full name",
+  "הזן קוד שיתוף": "Enter share code",
+  "הזן קוד שיתוף גבאים": "Enter co-gabbai share code",
+  "הזן שם פרשה או תאריך": "Enter parasha or date",
+  "חיפוש לפי שם": "Search by name",
+  "שם האורח": "Guest name",
+  "🔍 חיפוש מהיר לפי שם מתפלל...": "🔍 Quick search by congregant name..."
+};
+
+async function toggleLanguage(){
+  STATE.lang = STATE.lang === 'en' ? 'he' : 'en';
+  try{ await Store.set('lang', STATE.lang); }catch(e){}
+  render();
+}
+
+function translateSubstringInText(str){
+  let s = str;
+  const trimmed = s.trim();
+  if(!trimmed) return s;
+  if(EXACT_EN_MAP[trimmed]) return s.replace(trimmed, EXACT_EN_MAP[trimmed]);
+  if(PARASHA_EN_MAP[trimmed]) return s.replace(trimmed, PARASHA_EN_MAP[trimmed]);
+
+  // Replace known parasha names inside composite strings before pattern replacements
+  const sortedParashot = Object.keys(PARASHA_EN_MAP).sort((a,b)=>b.length - a.length);
+  for(const hebP of sortedParashot){
+    if(s.includes(hebP)){
+      s = s.split(hebP).join(PARASHA_EN_MAP[hebP]);
+    }
+  }
+
+  // Common dynamic patterns
+  s = s.replace(/🟢 ענן מסונכרן/g, '🟢 Cloud Synced')
+       .replace(/🔄 מסנכרן\.\.\./g, '🔄 Syncing...')
+       .replace(/👤 מחובר/g, '👤 Connected')
+       .replace(/קיבלת קוד שיתוף מגבאי אחר\?/g, 'Have a share code from another Gabbai?')
+       .replace(/מצטרף כגבאי נוסף לבית כנסת קיים\?/g, 'Joining an existing synagogue as Co-Gabbai?')
+       .replace(/עולה ראשון/g, '1st Aliyah (Rishon)')
+       .replace(/עולה שני/g, '2nd Aliyah (Sheni)')
+       .replace(/עולה שלישי/g, '3rd Aliyah (Shlishi)')
+       .replace(/עולה רביעי/g, '4th Aliyah (Revii)')
+       .replace(/עולה חמישי/g, '5th Aliyah (Chamishi)')
+       .replace(/עולה שישי/g, '6th Aliyah (Shishi)')
+       .replace(/עולה שביעי/g, '7th Aliyah (Shvii)')
+       .replace(/\(כהן\)/g, '(Kohen)')
+       .replace(/\(לוי\)/g, '(Levi)')
+       .replace(/🖐️ כהנים \((\d+)\)/g, '🖐️ Kohanim ($1)')
+       .replace(/🏺 לויים \((\d+)\)/g, '🏺 Leviim ($1)')
+       .replace(/🖐️ כהן/g, '🖐️ Kohen')
+       .replace(/🏺 לוי/g, '🏺 Levi')
+       .replace(/קורא חזק/g, 'Strong Reader')
+       .replace(/עד (\d+) פס'/g, 'Up to $1 v.')
+       .replace(/עד (\d+)/g, 'Up to $1')
+       .replace(/(\d+) פסוקים/g, '$1 verses')
+       .replace(/(\d+)\/7 עליות שובצו/g, '$1/7 Aliyot Assigned')
+       .replace(/(\d+) עליות/g, '$1 aliyot')
+       .replace(/👥 (\d+) בתור/g, '👥 $1 in Queue')
+       .replace(/📊 פער נוכחי: (\d+)/g, '📊 Current Spread: $1')
+       .replace(/📊 פער הוגנות: (\d+)/g, '📊 Fairness Spread: $1')
+       .replace(/שנה מעוברת/g, 'Leap Year')
+       .replace(/שנה פשוטה/g, 'Regular Year')
+       .replace(/הפרשות נקראות בנפרד/g, 'Parashot read separately')
+       .replace(/פרשות מחוברות מותאמות אוטומטית/g, 'Combined parashot auto-adjusted')
+       .replace(/✓ נבחר — /g, '✓ Selected — ')
+       .replace(/עובר לסוף התור/g, 'Moves to end of queue')
+       .replace(/לאחרונה:/g, 'Last read:')
+       .replace(/פרשת /g, 'Parashat ')
+       .replace(/שיבוץ עליות — /g, 'Aliyah Assignment — ')
+       .replace(/הכי הרבה:/g, 'Highest:')
+       .replace(/הכי מעט:/g, 'Lowest:')
+       .replace(/ממוצע/g, 'Avg')
+       .replace(/טיוטה פתוחה:/g, 'Open Draft:')
+       .replace(/שלום, /g, 'Welcome, ')
+       .replace(/זהו החיבור הראשון שלך עם Google\. בחר כיצד תרצה להגדיר את החשבון:/g, 'This is your first sign-in with Google. Choose how to set up your account:')
+       .replace(/הצטרפות כגבאי שותף:/g, 'Join as Co-Gabbai:')
+       .replace(/הזן את קוד השיתוף שקיבלת מהגבאי הראשי והתחבר עם Google או אימייל\./g, 'Enter the share code from your head Gabbai and sign in with Google or email.')
+       .replace(/שיתוף וסנכרון גבאים — /g, 'Co-Gabbai Cloud Sync — ')
+       .replace(/היסטוריית עליות — /g, 'Aliyah History — ')
+       .replace(/עריכת חלוקת פסוקים — /g, 'Edit Verse Split — ');
+  return s;
+}
+
+function translateDomToEnglish(rootEl){
+  if(!rootEl) return;
+  // 1. Translate placeholders & titles
+  const allEls = rootEl.querySelectorAll ? rootEl.querySelectorAll('*') : [];
+  allEls.forEach(el => {
+    if(el.placeholder && PLACEHOLDER_EN_MAP[el.placeholder]){
+      el.placeholder = PLACEHOLDER_EN_MAP[el.placeholder];
+    }
+    if(el.hasAttribute && el.hasAttribute('data-name')){
+      el.setAttribute('data-name', translateSubstringInText(el.getAttribute('data-name')));
+    }
+    if(el.hasAttribute && el.hasAttribute('data-meta')){
+      el.setAttribute('data-meta', translateSubstringInText(el.getAttribute('data-meta')));
+    }
+    if(el.hasAttribute && el.hasAttribute('data-status')){
+      el.setAttribute('data-status', translateSubstringInText(el.getAttribute('data-status')));
+    }
+    if(el.tagName === 'OPTGROUP' && el.label){
+      el.label = el.label
+        .replace('✅ מתאימים ופנויים (לפי תור ההוגנות)', '✅ Eligible & Matching (by Fairness Queue)')
+        .replace('💪 קוראים חזקים פנויים (לפי התור)', '💪 Available Strong Readers (by Queue)')
+        .replace('⏱ מתאימים אך קראו לפני 2 שבתות', '⏱ Matching (Read 2 Weeks Ago)')
+        .replace('↕️ מחוץ לטווח הפסוקים של העלייה', '↕️ Outside Verse Range for This Aliyah')
+        .replace('⛔ חסומים השבוע (שבוע שעבר / מושהים / משובצים / כהן-לוי)', '⛔ Unavailable This Week (Read Last Week / Paused / Assigned / Kohen-Levi)');
+    }
+    for(const child of Array.from(el.childNodes || [])){
+      if(child.nodeType === 3 && child.nodeValue && child.nodeValue.trim()){
+        child.nodeValue = translateSubstringInText(child.nodeValue);
+      }
+    }
+  });
 }
 
 function pushBackGuardState(){

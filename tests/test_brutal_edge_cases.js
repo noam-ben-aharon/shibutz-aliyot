@@ -596,6 +596,24 @@ console.log('\\n--- 12. Kohen / Levi Halachic Rules ("נתפרדה החבילה"
   const appHtmlWhenLoggedOut = document.getElementById('app').innerHTML || '';
   check('12f. When not logged in (!STATE.authUser), render() displays ONLY the Auth Gate and hides navigation tabs/home screen',
     appHtmlWhenLoggedOut.includes('authGateContainer') && !appHtmlWhenLoggedOut.includes('nav class="tabs"'));
+
+  // 12g. Bilingual English mode renders cleanly across Auth screen and all 5 main tabs
+  resetCleanState();
+  STATE.lang = 'en';
+  runAssignment('בראשית', '2026-10-10', {});
+  let enRenderOk = true;
+  try {
+    for (const tabName of ['assign', 'recent', 'people', 'queue', 'parashot']) {
+      STATE.tab = tabName;
+      render();
+    }
+    STATE.authUser = null;
+    render();
+  } catch (e) {
+    enRenderOk = false;
+  }
+  STATE.lang = 'he';
+  check('12g. English language mode (STATE.lang = "en") renders cleanly across Auth screen and all tabs', enRenderOk);
 }
 
 console.log('\\n======================================================');
