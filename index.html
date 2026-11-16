@@ -2461,13 +2461,13 @@ function render(){
           <div class="subtitle">חלוקה הוגנת ומותאמת אישית לכל שבת</div>
           <div class="account-bar">
             ${STATE.authUser ? `
-              <button type="button" class="cloud-status-pill ${STATE.cloudSyncStatus==='online'?'online':STATE.cloudSyncStatus==='syncing'?'syncing':''}" id="openShareModalBtn" title="לחץ לצפייה בקוד השיתוף לגבאי נוסף">
+              <button type="button" class="cloud-status-pill ${STATE.cloudSyncStatus==='online'?'online':STATE.cloudSyncStatus==='syncing'?'syncing':''}" id="openShareModalBtn" title="לחץ לצפייה בקוד השיתוף">
                 ${STATE.cloudSyncStatus==='online' ? '🟢 ענן מסונכרן' : STATE.cloudSyncStatus==='syncing' ? '🔄 מסנכרן...' : '👤 מחובר'} · ${escHtml(STATE.authUser.displayName || STATE.authUser.email)}
               </button>
-              <button type="button" class="cloud-status-pill" id="openCoGabbaiBtn">🤝 שיתוף גבאי</button>
+              <button type="button" class="cloud-status-pill" id="openCoGabbaiBtn">🤝 שיתוף חשבון</button>
               <button type="button" class="cloud-status-pill" id="logoutBtn">התנתק</button>
             ` : `
-              <button type="button" class="cloud-status-pill" id="openAuthModalBtn">🔐 כניסת גבאי / הרשמה (סנכרון ענן)</button>
+              <button type="button" class="cloud-status-pill" id="openAuthModalBtn">🔐 התחברות / הרשמה</button>
             `}
             <button type="button" class="cloud-status-pill" id="toggleLangBtn" title="החלף שפה / Switch Language">🌐 ${STATE.lang==='en' ? 'עברית' : 'English'}</button>
             ${typeof deferredInstallPrompt !== 'undefined' && deferredInstallPrompt ? `<button type="button" class="install-app-btn" id="installPwaBtn">📲 התקן כאפליקציה</button>` : ''}
@@ -4495,7 +4495,7 @@ async function initCloudSyncIfConfigured(){
       STATE.authUser = {
         uid: user.uid,
         email: user.email || '',
-        displayName: uData.displayName || user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי'),
+        displayName: uData.displayName || user.displayName || (user.email ? user.email.split('@')[0] : 'משתמש'),
         shulId,
         synagogueName,
         mode: 'cloud'
@@ -4540,7 +4540,7 @@ function renderAuthModal(isFullPageGate){
       const gUser = STATE.pendingGoogleUser || {};
       return `
         <div style="margin-bottom:14px;">
-          <div style="font-size:18px;font-weight:800;color:var(--ink);">שלום, ${escHtml(gUser.displayName || 'גבאי')}! 👋</div>
+          <div style="font-size:18px;font-weight:800;color:var(--ink);">שלום, ${escHtml(gUser.displayName || 'משתמש')}! 👋</div>
           <div class="note" style="margin-top:4px;">זהו החיבור הראשון שלך עם Google. בחר כיצד תרצה להגדיר את החשבון:</div>
         </div>
         <div id="authInlineAlert" class="auth-inline-alert"></div>
@@ -4551,8 +4551,8 @@ function renderAuthModal(isFullPageGate){
         </div>
         <div class="auth-divider">או הצטרף לבית כנסת קיים</div>
         <div class="field">
-          <label>אפשרות ב': הצטרפות כגבאי שותף (עם קוד שיתוף)</label>
-          <input type="text" id="onboardJoinCode" placeholder="הזן קוד שיתוף גבאים" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:17px;text-transform:uppercase;">
+          <label>אפשרות ב': הצטרפות לבית כנסת קיים (עם קוד שיתוף)</label>
+          <input type="text" id="onboardJoinCode" placeholder="הזן קוד שיתוף" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:17px;text-transform:uppercase;">
           <button type="button" class="btn btn-ink" id="onboardJoinShulBtn" style="width:100%;margin-top:8px;">🤝 התחבר לבית הכנסת והסתנכרן</button>
         </div>
       `;
@@ -4580,7 +4580,7 @@ function renderAuthModal(isFullPageGate){
           <button type="button" class="btn btn-gold" id="submitLoginBtn" style="flex:1;padding:12px;font-size:15px;">התחבר למערכת ←</button>
         </div>
         <div class="auth-footer-switch">
-          קיבלת קוד שיתוף מגבאי אחר? <button type="button" class="auth-link-btn" data-switch-mode="join">🤝 הצטרף עם קוד שיתוף</button>
+          יש לך קוד שיתוף לבית כנסת קיים? <button type="button" class="auth-link-btn" data-switch-mode="join">🤝 הצטרף עם קוד שיתוף</button>
         </div>
       `;
     }
@@ -4594,7 +4594,7 @@ function renderAuthModal(isFullPageGate){
           <input type="text" id="regShulName" placeholder="הזן את שם בית הכנסת" value="">
         </div>
         <div class="field">
-          <label>שם מלא (גבאי)</label>
+          <label>שם מלא</label>
           <input type="text" id="regGabbaiName" placeholder="הזן שם מלא" autocomplete="name">
         </div>
         <div class="field">
@@ -4612,7 +4612,7 @@ function renderAuthModal(isFullPageGate){
           <button type="button" class="btn btn-gold" id="submitRegBtn" style="flex:1;padding:12px;font-size:15px;">✨ הרשמה</button>
         </div>
         <div class="auth-footer-switch">
-          מצטרף כגבאי נוסף לבית כנסת קיים? <button type="button" class="auth-link-btn" data-switch-mode="join">🤝 הזן קוד שיתוף</button>
+          מצטרף לבית כנסת קיים? <button type="button" class="auth-link-btn" data-switch-mode="join">🤝 הזן קוד שיתוף</button>
         </div>
       `;
     }
@@ -4621,7 +4621,7 @@ function renderAuthModal(isFullPageGate){
     return `
       <div id="authInlineAlert" class="auth-inline-alert"></div>
       <div class="note" style="margin-top:0;margin-bottom:12px;background:#FAF3E3;padding:10px 12px;border-radius:10px;border:1px solid var(--line);color:var(--ink);">
-        🤝 <b>הצטרפות כגבאי שותף:</b> הזן את קוד השיתוף שקיבלת מהגבאי הראשי והתחבר עם Google או אימייל.
+        🤝 <b>הצטרפות לבית כנסת קיים:</b> הזן את קוד השיתוף שקיבלת והתחבר עם Google או אימייל.
       </div>
       <div class="field">
         <label>קוד שיתוף בית הכנסת</label>
@@ -4629,7 +4629,7 @@ function renderAuthModal(isFullPageGate){
       </div>
       ${googleBtnHtml}
       <div class="field">
-        <label>השם שלך</label>
+        <label>שם מלא</label>
         <input type="text" id="joinGabbaiName" placeholder="הזן שם מלא">
       </div>
       <div class="field">
@@ -4657,7 +4657,7 @@ function renderAuthModal(isFullPageGate){
       <div class="auth-showcase">
         <div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <div class="auth-showcase-badge">✨ מערכת ניהול גבאים חכמה</div>
+            <div class="auth-showcase-badge">✨ מערכת חכמה לניהול עליות</div>
             <button type="button" class="cloud-status-pill" id="authLangToggleBtn" style="background:rgba(255,255,255,0.12);color:#FBF6E9;border-color:rgba(194,155,86,0.45);">🌐 ${STATE.lang==='en' ? 'עברית' : 'English'}</button>
           </div>
           <div style="margin-top:22px;display:flex;align-items:center;gap:14px;">
@@ -4680,7 +4680,7 @@ function renderAuthModal(isFullPageGate){
               <div style="font-size:13px;color:#EBD29C;font-weight:700;margin-top:2px;">חלוקה הוגנת ומסונכרנת לכל שבת</div>
             </div>
           </div>
-          <p style="margin-top:16px;">ניהול שקוף, הלכתי ומדויק של סבב העליות בבית הכנסת — עם התאמה אוטומטית לטווח הפסוקים של כל קורא וסנכרון ענן בזמן אמת בין הגבאים.</p>
+          <p style="margin-top:16px;">ניהול שקוף, הלכתי ומדויק של סבב העליות בבית הכנסת — עם התאמה אוטומטית לטווח הפסוקים של כל קורא וסנכרון ענן בזמן אמת בין מכשירים.</p>
           <div class="auth-feature-list">
             <div class="auth-feature-item">
               <div class="auth-feature-icon">⚖️</div>
@@ -4699,8 +4699,8 @@ function renderAuthModal(isFullPageGate){
             <div class="auth-feature-item">
               <div class="auth-feature-icon">☁️</div>
               <div>
-                <div class="auth-feature-title">סנכרון גבאים חי ושליחה לוואטסאפ</div>
-                <div class="auth-feature-sub">כל שינוי מתעדכן מיד אצל כל גבאי בית הכנסת, כולל שליחת הודעה אישית עם קישור לקריאה.</div>
+                <div class="auth-feature-title">סנכרון ענן חי ושליחה לוואטסאפ</div>
+                <div class="auth-feature-sub">כל שינוי מתעדכן מיד בכל המכשירים המחוברים, כולל שליחת הודעה אישית עם קישור לקריאה.</div>
               </div>
             </div>
           </div>
@@ -4817,13 +4817,13 @@ function renderAuthModal(isFullPageGate){
       await fbModules.setDoc(fbModules.doc(fbDb, 'shuls', shulId), buildCurrentShulPayload(), { merge: true });
       await fbModules.setDoc(fbModules.doc(fbDb, 'users', gUser.uid), {
         email: gUser.email || '',
-        displayName: gUser.displayName || 'גבאי',
+        displayName: gUser.displayName || 'משתמש',
         shulId,
         synagogueName: shulName,
         updatedAt: new Date().toISOString()
       });
       STATE.pendingGoogleUser = null;
-      STATE.authUser = { uid: gUser.uid, email: gUser.email || '', displayName: gUser.displayName || 'גבאי', shulId, synagogueName: shulName, mode: 'cloud' };
+      STATE.authUser = { uid: gUser.uid, email: gUser.email || '', displayName: gUser.displayName || 'משתמש', shulId, synagogueName: shulName, mode: 'cloud' };
       await Store.set('shulId', shulId);
       await Store.set('synagogueName', shulName);
       await Store.set('authUser', JSON.stringify(STATE.authUser));
@@ -4836,7 +4836,7 @@ function renderAuthModal(isFullPageGate){
     const onboardJoinBtn = backdrop.querySelector('#onboardJoinShulBtn');
     if(onboardJoinBtn) onboardJoinBtn.onclick = async ()=>{
       const code = (backdrop.querySelector('#onboardJoinCode').value || '').trim().toUpperCase();
-      if(!code || code.length < 4){ showInlineAlert('יש להזין קוד שיתוף גבאים תקין.', 'error'); return; }
+      if(!code || code.length < 4){ showInlineAlert('יש להזין קוד שיתוף תקין.', 'error'); return; }
       const gUser = STATE.pendingGoogleUser;
       if(!gUser) return;
       onboardJoinBtn.disabled = true;
@@ -4854,7 +4854,7 @@ function renderAuthModal(isFullPageGate){
       await applyShulSnapshotToState(remoteData);
       await fbModules.setDoc(fbModules.doc(fbDb, 'users', gUser.uid), {
         email: gUser.email || '',
-        displayName: gUser.displayName || 'גבאי',
+        displayName: gUser.displayName || 'משתמש',
         shulId: code,
         synagogueName: shulName,
         updatedAt: new Date().toISOString()
@@ -4862,7 +4862,7 @@ function renderAuthModal(isFullPageGate){
       STATE.pendingGoogleUser = null;
       STATE.shulId = code;
       STATE.synagogueName = shulName;
-      STATE.authUser = { uid: gUser.uid, email: gUser.email || '', displayName: gUser.displayName || 'גבאי', shulId: code, synagogueName: shulName, mode: 'cloud' };
+      STATE.authUser = { uid: gUser.uid, email: gUser.email || '', displayName: gUser.displayName || 'משתמש', shulId: code, synagogueName: shulName, mode: 'cloud' };
       await Store.set('shulId', code);
       await Store.set('synagogueName', shulName);
       await Store.set('authUser', JSON.stringify(STATE.authUser));
@@ -4979,7 +4979,7 @@ function renderAuthModal(isFullPageGate){
       const gabbaiName = (backdrop.querySelector('#joinGabbaiName').value || '').trim();
       const email = (backdrop.querySelector('#joinEmail').value || '').trim().toLowerCase();
       const pass = backdrop.querySelector('#joinPass').value || '';
-      if(!code || code.length < 4){ showInlineAlert('נא להזין קוד שיתוף גבאים תקין (למשל NETZACH).', 'error'); return; }
+      if(!code || code.length < 4){ showInlineAlert('נא להזין קוד שיתוף תקין.', 'error'); return; }
       if(!email || pass.length < 6){ showInlineAlert('נא להזין כתובת אימייל וסיסמה (לפחות 6 תווים).', 'error'); return; }
       joinBtn.disabled = true;
       joinBtn.textContent = 'מתחבר ומסנכרן...';
@@ -5033,7 +5033,7 @@ function renderAuthModal(isFullPageGate){
 async function finalizeAuthenticatedSession(user, mode, backdrop, showInlineAlert, switchAuthModeSmooth){
   let shulId = STATE.shulId || 'NETZACH';
   let shulName = STATE.synagogueName || 'בית כנסת נצח בנים';
-  let displayName = user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי');
+  let displayName = user.displayName || (user.email ? user.email.split('@')[0] : 'משתמש');
 
   if(mode === 'register'){
     const inpShul = backdrop.querySelector('#regShulName');
@@ -5156,11 +5156,11 @@ function renderShareModal(){
   const backdrop = el(`<div class="modal-backdrop"></div>`);
   backdrop.innerHTML = `
     <div class="modal" style="max-width:460px;">
-      <h3>🤝 שיתוף וסנכרון גבאים — ${escHtml(STATE.synagogueName)}</h3>
-      <div class="note">כל גבאי נוסף של בית הכנסת (למשל אבא שלך) שيتחבר עם הקוד הזה או דרך הקישור המהיר למטה, יראה ויעדכן <b>בדיוק את אותם נתונים בזמן אמת</b>:</div>
+      <h3>🤝 שיתוף וסנכרון חשבון — ${escHtml(STATE.synagogueName)}</h3>
+      <div class="note">כל מי שיתחבר עם קוד השיתוף הזה או דרך הקישור המהיר למטה, יראה ויעדכן <b>בדיוק את אותם נתונים בזמן אמת</b>:</div>
       <div class="share-code-box">${escHtml(shulCode)}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
-        <a class="btn btn-gold" href="${waInviteLink}" target="_blank" style="flex:1;text-align:center;text-decoration:none;">📱 שלח קישור התחברות לאבא בוואטסאפ</a>
+        <a class="btn btn-gold" href="${waInviteLink}" target="_blank" style="flex:1;text-align:center;text-decoration:none;">📱 שלח קישור התחברות בוואטסאפ</a>
       </div>
       <div class="modal-actions" style="margin-top:16px;">
         <button type="button" class="btn btn-outline" id="closeShareModal" style="flex:1;">סגירה</button>
@@ -5253,17 +5253,17 @@ const PARASHA_EN_MAP = {
 
 const EXACT_EN_MAP = {
   // Auth & Onboarding
-  "✨ מערכת ניהול גבאים חכמה": "✨ Smart Gabbai Management System",
+  "✨ מערכת חכמה לניהול עליות": "✨ Smart Aliyah Management System",
   "שיבוץ עליות לתורה": "Torah Aliyah Scheduler",
   "חלוקה הוגנת ומסונכרנת לכל שבת": "Fair & Cloud-Synced Assignments Every Shabbat",
   "חלוקה הוגנת ומותאמת אישית לכל שבת": "Fair & Personalized Aliyah Assignments Every Shabbat",
-  "ניהול שקוף, הלכתי ומדויק של סבב העליות בבית הכנסת — עם התאמה אוטומטית לטווח הפסוקים של כל קורא וסנכרון ענן בזמן אמת בין הגבאים.": "Transparent, halachic, and accurate Torah reading rotation — automatically matched to each congregant's verse capacity and synced in real time across Gabbais.",
+  "ניהול שקוף, הלכתי ומדויק של סבב העליות בבית הכנסת — עם התאמה אוטומטית לטווח הפסוקים של כל קורא וסנכרון ענן בזמן אמת בין מכשירים.": "Transparent, halachic, and accurate Torah reading rotation — automatically matched to each congregant's verse capacity and synced in real time across devices.",
   "אלגוריתם הוגנות והתאמת פסוקים": "Fairness & Verse-Range Algorithm",
   "שיבוץ אוטומטי לפי תור ההוגנות, יכולת הקריאה וכלל הברזל נגד כפילות שבועית.": "Automatic matching by fairness queue, verse capacity, and consecutive-week protection.",
   "הלכה ולוח עברי מובנה": "Built-in Halacha & Hebrew Calendar",
   "תמיכה בכהן ולוי (\"נתפרדה החבילה\"), זיהוי שנה מעוברת ופרשות מחוברות.": "Full Kohen & Levi halachic logic, automatic leap-year detection, and combined parashot.",
-  "סנכרון גבאים חי ושליחה לוואטסאפ": "Live Gabbai Cloud Sync & WhatsApp",
-  "כל שינוי מתעדכן מיד אצל כל גבאי בית הכנסת, כולל שליחת הודעה אישית עם קישור לקריאה.": "Every update syncs instantly across Gabbais, with 1-click personal WhatsApp messages.",
+  "סנכרון ענן חי ושליחה לוואטסאפ": "Live Cloud Sync & WhatsApp",
+  "כל שינוי מתעדכן מיד בכל המכשירים המחוברים, כולל שליחת הודעה אישית עם קישור לקריאה.": "Every update syncs instantly across connected devices, with 1-click personal WhatsApp messages.",
   "🔒 מאובטח ומסונכרן בענן Google Firebase": "🔒 Secured & Synced via Google Firebase Cloud",
   "התחברות": "Sign In",
   "הרשמה": "Sign Up",
@@ -5278,7 +5278,7 @@ const EXACT_EN_MAP = {
   "🤝 הצטרף עם קוד שיתוף": "🤝 Join with Share Code",
   "🤝 הזן קוד שיתוף": "🤝 Enter Share Code",
   "שם בית הכנסת": "Synagogue Name",
-  "שם מלא (גבאי)": "Full Name (Gabbai)",
+  "שם מלא": "Full Name",
   "השם שלך": "Your Name",
   "קוד שיתוף בית הכנסת": "Synagogue Share Code",
   "🤝 התחבר והסתנכרן עכשיו": "🤝 Connect & Sync Now",
@@ -5286,7 +5286,7 @@ const EXACT_EN_MAP = {
   "אפשרות א': הקמת בית כנסת חדש": "Option A: Create a New Synagogue",
   "✨ הקם בית כנסת חדש והיכנס": "✨ Create Synagogue & Enter",
   "או הצטרף לבית כנסת קיים": "or join an existing synagogue",
-  "אפשרות ב': הצטרפות כגבאי שותף (עם קוד שיתוף)": "Option B: Join as Co-Gabbai (with Share Code)",
+  "אפשרות ב': הצטרפות לבית כנסת קיים (עם קוד שיתוף)": "Option B: Join an Existing Synagogue (with Share Code)",
   "🤝 התחבר לבית הכנסת והסתנכרן": "🤝 Join Synagogue & Sync",
   "בית כנסת נצח בנים": "Netzach Banim Synagogue",
 
@@ -5296,10 +5296,10 @@ const EXACT_EN_MAP = {
   "👥 מתפללים": "👥 Congregants",
   "⚖️ תור והוגנות": "⚖️ Queue & Fairness",
   "⚙️ הגדרות ופרשות": "⚙️ Settings & Parashot",
-  "🤝 שיתוף גבאי": "🤝 Invite Co-Gabbai",
+  "🤝 שיתוף חשבון": "🤝 Share Account",
   "התנתק": "Log Out",
   "📲 התקן כאפליקציה": "📲 Install App",
-  "🔐 כניסת גבאי / הרשמה (סנכרון ענן)": "🔐 Gabbai Sign In / Sign Up",
+  "🔐 התחברות / הרשמה": "🔐 Sign In / Sign Up",
 
   // Weekly Assignment Tab
   "בחירת פרשת השבוע": "Select Weekly Parasha",
@@ -5420,7 +5420,7 @@ const EXACT_EN_MAP = {
   "העתקת השיבוץ": "Copy Assignment Text",
   "📋 נסה להעתיק": "📋 Copy to Clipboard",
   "🖨️ הדפס": "🖨️ Print",
-  "📱 שלח קישור התחברות לאבא בוואטסאפ": "📱 Send Co-Gabbai Invite Link via WhatsApp",
+  "📱 שלח קישור התחברות בוואטסאפ": "📱 Send Invite Link via WhatsApp",
   "עריכת חלוקת פסוקים": "Edit Verse Split",
   "הזן/י את מספר הפסוקים בכל עלייה לפי החומש הנהוג בבית הכנסת.": "Enter the number of verses for each aliyah according to your synagogue's Chumash.",
   "הוספת שבת עבר": "Add Past Shabbat",
@@ -5442,7 +5442,6 @@ const PLACEHOLDER_EN_MAP = {
   "הזן את שם בית הכנסת": "Enter synagogue name",
   "הזן שם מלא": "Enter full name",
   "הזן קוד שיתוף": "Enter share code",
-  "הזן קוד שיתוף גבאים": "Enter co-gabbai share code",
   "הזן שם פרשה או תאריך": "Enter parasha or date",
   "חיפוש לפי שם": "Search by name",
   "שם האורח": "Guest name",
@@ -5472,8 +5471,11 @@ function translateSubstringInText(str){
   s = s.replace(/🟢 ענן מסונכרן/g, '🟢 Cloud Synced')
        .replace(/🔄 מסנכרן\.\.\./g, '🔄 Syncing...')
        .replace(/👤 מחובר/g, '👤 Connected')
-       .replace(/קיבלת קוד שיתוף מגבאי אחר\?/g, 'Have a share code from another Gabbai?')
-       .replace(/מצטרף כגבאי נוסף לבית כנסת קיים\?/g, 'Joining an existing synagogue as Co-Gabbai?')
+       .replace(/יש לך קוד שיתוף לבית כנסת קיים\?/g, 'Have a share code for an existing synagogue?')
+       .replace(/מצטרף לבית כנסת קיים\?/g, 'Joining an existing synagogue?')
+       .replace(/הצטרפות לבית כנסת קיים:/g, 'Join Existing Synagogue:')
+       .replace(/הזן את קוד השיתוף שקיבלת והתחבר עם Google או אימייל\./g, 'Enter your share code and sign in with Google or email.')
+       .replace(/שיתוף וסנכרון חשבון — /g, 'Account Share & Cloud Sync — ')
        .replace(/עולה ראשון/g, '1st Aliyah (Rishon)')
        .replace(/עולה שני/g, '2nd Aliyah (Sheni)')
        .replace(/עולה שלישי/g, '3rd Aliyah (Shlishi)')
@@ -5510,9 +5512,6 @@ function translateSubstringInText(str){
        .replace(/טיוטה פתוחה:/g, 'Open Draft:')
        .replace(/שלום, /g, 'Welcome, ')
        .replace(/זהו החיבור הראשון שלך עם Google\. בחר כיצד תרצה להגדיר את החשבון:/g, 'This is your first sign-in with Google. Choose how to set up your account:')
-       .replace(/הצטרפות כגבאי שותף:/g, 'Join as Co-Gabbai:')
-       .replace(/הזן את קוד השיתוף שקיבלת מהגבאי הראשי והתחבר עם Google או אימייל\./g, 'Enter the share code from your head Gabbai and sign in with Google or email.')
-       .replace(/שיתוף וסנכרון גבאים — /g, 'Co-Gabbai Cloud Sync — ')
        .replace(/היסטוריית עליות — /g, 'Aliyah History — ')
        .replace(/עריכת חלוקת פסוקים — /g, 'Edit Verse Split — ');
 
