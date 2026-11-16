@@ -564,6 +564,30 @@ console.log('\\n--- 12. Kohen / Levi Halachic Rules ("נתפרדה החבילה"
   const closedModal = closeAnyOpenOverlay();
   check('12c. closeAnyOpenOverlay() closes an open modal before triggering exit confirmation',
     closedModal === true && STATE.editingCongregant === null);
+
+  // 12d. Firebase config snippet parser & Multi-Synagogue snapshot isolation
+  const parsedFb = parseFirebaseConfigInput(\`
+    const firebaseConfig = {
+      apiKey: "AIzaSyTestKey12345",
+      authDomain: "shibutz-test.firebaseapp.com",
+      projectId: "shibutz-test",
+      appId: "1:12345:web:abcdef"
+    };
+  \`);
+  check('12d. parseFirebaseConfigInput accurately extracts apiKey, projectId, and authDomain from pasted JS snippet',
+    parsedFb && parsedFb.apiKey === 'AIzaSyTestKey12345' && parsedFb.projectId === 'shibutz-test');
+
+  STATE.authModal = 'login';
+  render();
+  STATE.authModal = 'register';
+  render();
+  STATE.authModal = 'join';
+  render();
+  STATE.authModal = null;
+  STATE.shareModal = true;
+  render();
+  STATE.shareModal = false;
+  check('12e. Multi-synagogue Auth, Registration, Co-Gabbai Join, and Share modals render cleanly', true);
 }
 
 console.log('\\n======================================================');

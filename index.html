@@ -504,7 +504,7 @@ details.parashot-details > summary .sum-badge{
 }
 details.parashot-details[open] > summary{margin-bottom:10px; border-bottom:1px solid var(--line); padding-bottom:12px;}
 
-/* Header install app button */
+/* Header install app button & Account / Cloud bar */
 .install-app-btn{
   background:linear-gradient(135deg, #2C3D63, #1D2742); color:#FBF6E9;
   border:1px solid var(--gold); border-radius:999px; padding:6px 14px;
@@ -513,6 +513,63 @@ details.parashot-details[open] > summary{margin-bottom:10px; border-bottom:1px s
   box-shadow:0 3px 10px rgba(29,39,66,0.18); transition:all .15s ease;
 }
 .install-app-btn:hover{transform:translateY(-1px); box-shadow:0 5px 14px rgba(29,39,66,0.26);}
+
+.account-bar{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin-top:6px;
+}
+.cloud-status-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 11px; border-radius:999px; font-size:12px; font-weight:700;
+  border:1px solid var(--line); background:#FFFDF8; color:var(--ink);
+  cursor:pointer; transition:all .15s ease;
+}
+.cloud-status-pill:hover{border-color:var(--gold); background:var(--gold-light);}
+.cloud-status-pill.online{background:var(--good-bg); color:var(--good); border-color:#B5D1B0;}
+.cloud-status-pill.syncing{background:#FDF3DC; color:#8A6218; border-color:#E2C47E;}
+
+.auth-tabs{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:6px;
+  background:#F5EDE0; padding:5px; border-radius:12px; border:1px solid var(--line);
+  margin-bottom:16px;
+}
+.auth-tab-btn{
+  border:none; background:transparent; padding:8px 6px; border-radius:8px;
+  font-family:'Assistant',sans-serif; font-size:13px; font-weight:700; color:var(--ink-soft);
+  cursor:pointer; transition:all .15s ease;
+}
+.auth-tab-btn.active{
+  background:var(--ink); color:#FBF6E9; box-shadow:0 2px 8px rgba(29,39,66,0.2);
+}
+.btn-google{
+  width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:11px 16px; border-radius:11px; border:1.5px solid #D5C7A9;
+  background:#fff; color:var(--ink); font-family:'Assistant',sans-serif;
+  font-size:15px; font-weight:800; cursor:pointer; transition:all .15s ease;
+  box-shadow:0 2px 6px rgba(29,39,66,0.06);
+}
+.btn-google:hover{background:#FAF6EE; border-color:var(--gold); transform:translateY(-1px);}
+.auth-divider{
+  display:flex; align-items:center; gap:10px; margin:14px 0;
+  color:var(--ink-soft); font-size:12px; font-weight:700;
+}
+.auth-divider::before, .auth-divider::after{
+  content:''; flex:1; height:1px; background:var(--line);
+}
+.share-code-box{
+  font-family:monospace; font-size:24px; font-weight:900; letter-spacing:4px;
+  text-align:center; padding:12px 16px; border-radius:12px;
+  background:linear-gradient(180deg,#FAF3E3,#EFE2C4); border:2px dashed var(--gold-deep);
+  color:var(--ink); margin:10px 0; user-select:all;
+}
+input[type=email], input[type=password]{
+  width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line);
+  font-family:'Assistant',sans-serif; font-size:15px; background:#fff; color:var(--ink);
+  transition:border-color .15s, box-shadow .15s;
+}
+input[type=email]:focus, input[type=password]:focus{
+  outline:none; border-color:var(--gold); box-shadow:0 0 0 3px rgba(194,155,86,0.18);
+}
 </style>
 </head>
 <body>
@@ -682,7 +739,14 @@ let STATE = {
   fairnessSimLower:null,  // ephemeral: what-if slider state on the fairness tab, null = falls back to matchSettings
   fairnessSimUpper:null,
   exitConfirmModal:false, // true when the back-button exit confirmation modal is open
-  parashotDetailsOpen:false // keeps the 60-parasha table open on the Settings tab when toggled/edited
+  parashotDetailsOpen:false, // keeps the 60-parasha table open on the Settings tab when toggled/edited
+  synagogueName:'בית כנסת נצח בנים', // dynamic per-synagogue name
+  shulId:'netzach-banim', // active synagogue workspace id (for multi-synagogue isolation & co-gabbai sync)
+  authUser:null,          // {uid, email, displayName, shulId, synagogueName, mode:'cloud'|'local'}
+  authModal:null,         // null | 'login' | 'register' | 'join'
+  shareModal:false,       // true when the co-gabbai share code modal is open
+  cloudConfigModal:false, // true when the Firebase config setup modal is open
+  cloudSyncStatus:'local' // 'local' | 'connecting' | 'online' | 'syncing' | 'error'
 };
 
 // ---------- Kohen / Levi / Yisrael halachic helpers ----------
@@ -1059,6 +1123,33 @@ async function loadAll(){
     if(wt && wt.value) STATE.whatsappTemplate = wt.value;
   }catch(e){}
 
+  try{
+    const sn = await Store.get('synagogueName');
+    if(sn && sn.value) STATE.synagogueName = sn.value;
+  }catch(e){}
+
+  try{
+    const sid = await Store.get('shulId');
+    if(sid && sid.value) STATE.shulId = sid.value;
+  }catch(e){}
+
+  try{
+    const au = await Store.get('authUser');
+    if(au && au.value) STATE.authUser = JSON.parse(au.value);
+  }catch(e){}
+
+  // Check if URL has ?join=SHUL_CODE for 1-click Co-Gabbai invite
+  try{
+    if(typeof location !== 'undefined' && location.search){
+      const params = new URLSearchParams(location.search);
+      const joinCode = params.get('join');
+      if(joinCode){
+        STATE.pendingJoinCode = joinCode.trim().toUpperCase();
+        STATE.authModal = 'join';
+      }
+    }
+  }catch(e){}
+
   // Show a cached calendar immediately (no "loading..." flash on repeat visits) while a fresh
   // copy is fetched in the background below, regardless of cache age - fetchUpcomingParasha()
   // silently replaces it once the network call resolves either way.
@@ -1078,13 +1169,15 @@ async function loadAll(){
   STATE.loaded = true;
   render();
   fetchUpcomingParasha();
+  if(typeof initCloudSyncIfConfigured === 'function') initCloudSyncIfConfigured();
 }
-async function saveMatchSettings(){ try{ await Store.set('matchSettings', JSON.stringify(STATE.matchSettings)); }catch(e){} }
-async function saveWhatsappTemplate(){ try{ await Store.set('whatsappTemplate', STATE.whatsappTemplate||''); }catch(e){} }
-async function saveCongregants(){ invalidateStatsCache(); try{ await Store.set('congregants', JSON.stringify(STATE.congregants)); }catch(e){} }
-async function saveWeeklyLog(){ invalidateStatsCache(); try{ await Store.set('weeklyLog', JSON.stringify(STATE.weeklyLog)); }catch(e){} }
-async function saveParashot(){ try{ await Store.set('parashot', JSON.stringify(STATE.parashot)); }catch(e){} }
-async function saveCurrent(){ try{ await Store.set('current', JSON.stringify(STATE.current)); }catch(e){} }
+async function saveSynagogueName(){ try{ await Store.set('synagogueName', STATE.synagogueName||'בית כנסת נצח בנים'); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+async function saveMatchSettings(){ try{ await Store.set('matchSettings', JSON.stringify(STATE.matchSettings)); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+async function saveWhatsappTemplate(){ try{ await Store.set('whatsappTemplate', STATE.whatsappTemplate||''); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+async function saveCongregants(){ invalidateStatsCache(); try{ await Store.set('congregants', JSON.stringify(STATE.congregants)); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+async function saveWeeklyLog(){ invalidateStatsCache(); try{ await Store.set('weeklyLog', JSON.stringify(STATE.weeklyLog)); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+async function saveParashot(){ try{ await Store.set('parashot', JSON.stringify(STATE.parashot)); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
+async function saveCurrent(){ try{ await Store.set('current', JSON.stringify(STATE.current)); }catch(e){} if(typeof scheduleCloudPush==='function') scheduleCloudPush(); }
 
 // ---------- backup export/import ----------
 function csvEscape(val){
@@ -2247,11 +2340,22 @@ function render(){
           </svg>
         </div>
         <div>
-          <div class="eyebrow">בית כנסת נצח בנים</div>
+          <div class="eyebrow">${escHtml(STATE.synagogueName || 'בית כנסת נצח בנים')}</div>
           <h1>שיבוץ עליות לתורה</h1>
           <div class="subtitle">חלוקה הוגנת ומותאמת אישית לכל שבת</div>
+          <div class="account-bar">
+            ${STATE.authUser ? `
+              <button type="button" class="cloud-status-pill ${STATE.cloudSyncStatus==='online'?'online':STATE.cloudSyncStatus==='syncing'?'syncing':''}" id="openShareModalBtn" title="לחץ לצפייה בקוד השיתוף לגבאי נוסף (למשל אבא שלך)">
+                ${STATE.cloudSyncStatus==='online' ? '🟢 ענן מסונכרן' : STATE.cloudSyncStatus==='syncing' ? '🔄 מסנכרן...' : '👤 מחובר'} · ${escHtml(STATE.authUser.displayName || STATE.authUser.email)}
+              </button>
+              <button type="button" class="cloud-status-pill" id="openCoGabbaiBtn">🤝 שיתוף גבאי</button>
+              <button type="button" class="cloud-status-pill" id="logoutBtn">התנתק</button>
+            ` : `
+              <button type="button" class="cloud-status-pill" id="openAuthModalBtn">🔐 כניסת גבאי / הרשמה (סנכרון ענן)</button>
+            `}
+            ${typeof deferredInstallPrompt !== 'undefined' && deferredInstallPrompt ? `<button type="button" class="install-app-btn" id="installPwaBtn">📲 התקן כאפליקציה</button>` : ''}
+          </div>
         </div>
-        ${typeof deferredInstallPrompt !== 'undefined' && deferredInstallPrompt ? `<button type="button" class="install-app-btn" id="installPwaBtn">📲 התקן כאפליקציה</button>` : ''}
       </div>
       <nav class="tabs">
         <button data-tab="assign" class="${STATE.tab==='assign'?'active':''}">🗓️ שיבוץ השבוע</button>
@@ -2273,6 +2377,15 @@ function render(){
       render();
     };
   }
+  const openAuthBtn = document.getElementById('openAuthModalBtn');
+  if(openAuthBtn) openAuthBtn.onclick = ()=>{ STATE.authModal = 'login'; render(); };
+  const openShareBtn = document.getElementById('openShareModalBtn');
+  if(openShareBtn) openShareBtn.onclick = ()=>{ STATE.shareModal = true; render(); };
+  const openCoGabbaiBtn = document.getElementById('openCoGabbaiBtn');
+  if(openCoGabbaiBtn) openCoGabbaiBtn.onclick = ()=>{ STATE.shareModal = true; render(); };
+  const logoutBtn = document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.onclick = ()=>{ if(typeof handleLogout === 'function') handleLogout(); };
+
   document.querySelectorAll('nav.tabs button').forEach(b=>{
     b.onclick = ()=>{ STATE.tab = b.dataset.tab; render(); };
   });
@@ -2292,6 +2405,9 @@ function render(){
   if(STATE.noticeModal!==null) content.appendChild(renderNoticeModal());
   if(STATE.printModal!==null) content.appendChild(renderPrintModal());
   if(STATE.exitConfirmModal) content.appendChild(renderExitConfirmModal());
+  if(STATE.authModal!==null) content.appendChild(renderAuthModal());
+  if(STATE.shareModal) content.appendChild(renderShareModal());
+  if(STATE.cloudConfigModal) content.appendChild(renderCloudConfigModal());
 
   if(focusId){
     const toFocus = document.getElementById(focusId);
@@ -2356,7 +2472,7 @@ async function printWeek(parashaName, dateISO, assignObj){
   const content = `
     <div dir="rtl" style="max-width:720px;margin:30px auto;border:3px double #333;padding:36px 44px;font-family:'Assistant',Arial,sans-serif;">
       <div style="text-align:center;">
-        <div style="font-size:15px;font-weight:800;letter-spacing:2px;color:#555;">בית כנסת נצח בנים</div>
+        <div style="font-size:15px;font-weight:800;letter-spacing:2px;color:#555;">${escHtml(STATE.synagogueName || 'בית כנסת נצח בנים')}</div>
         <div style="height:2px;background:repeating-linear-gradient(90deg,#333 0 10px,transparent 10px 18px);margin:10px auto 18px;width:220px;"></div>
         <div style="font-size:34px;font-weight:900;margin-top:6px;">פרשת ${parashaName}</div>
         <div style="font-size:17px;margin-top:6px;color:#444;">שבת קודש · ${dateLine}</div>
@@ -4031,8 +4147,661 @@ function closeAnyOpenOverlay(){
   if(STATE.confirmModal !== null){ STATE.confirmModal = null; render(); return true; }
   if(STATE.noticeModal !== null){ STATE.noticeModal = null; render(); return true; }
   if(STATE.printModal !== null){ STATE.printModal = null; render(); return true; }
+  if(STATE.authModal !== null){ STATE.authModal = null; render(); return true; }
+  if(STATE.shareModal){ STATE.shareModal = false; render(); return true; }
+  if(STATE.cloudConfigModal){ STATE.cloudConfigModal = false; render(); return true; }
   if(STATE.exitConfirmModal){ STATE.exitConfirmModal = false; render(); return true; }
   return false;
+}
+
+// ---------- Multi-Synagogue Authentication, Registration, Google Sign-In & Cloud Sync ----------
+// Can be pre-configured here for all devices on GitHub Pages, or pasted once in the Cloud Setup modal:
+const DEFAULT_FIREBASE_CONFIG = null;
+
+let fbApp = null;
+let fbAuth = null;
+let fbDb = null;
+let fbModules = null;
+let activeShulUnsubscribe = null;
+let cloudPushTimer = null;
+let isApplyingCloudSnapshot = false;
+
+function generateShulShareCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function getStoredFirebaseConfig(){
+  if(DEFAULT_FIREBASE_CONFIG && DEFAULT_FIREBASE_CONFIG.apiKey) return DEFAULT_FIREBASE_CONFIG;
+  try{
+    const raw = localStorage.getItem(LS_PREFIX + 'firebaseConfig');
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed && parsed.apiKey && parsed.projectId) return parsed;
+    }
+  }catch(e){}
+  return null;
+}
+
+function parseFirebaseConfigInput(rawText){
+  const txt = String(rawText || '').trim();
+  if(!txt) return null;
+  try{
+    const direct = JSON.parse(txt);
+    if(direct && direct.apiKey && direct.projectId) return direct;
+  }catch(e){}
+  // Extract key-value pairs from a pasted JS snippet (`const firebaseConfig = { apiKey: "...", ... };`)
+  const extract = (key) => {
+    const m = txt.match(new RegExp(key + '\\s*:\\s*["\']([^"\']+)["\']'));
+    return m ? m[1].trim() : '';
+  };
+  const apiKey = extract('apiKey');
+  const projectId = extract('projectId');
+  if(!apiKey || !projectId) return null;
+  return {
+    apiKey,
+    authDomain: extract('authDomain') || `${projectId}.firebaseapp.com`,
+    projectId,
+    storageBucket: extract('storageBucket') || `${projectId}.appspot.com`,
+    messagingSenderId: extract('messagingSenderId'),
+    appId: extract('appId')
+  };
+}
+
+async function ensureFirebaseLoaded(){
+  const cfg = getStoredFirebaseConfig();
+  if(!cfg) return false;
+  if(fbApp && fbAuth && fbDb && fbModules) return true;
+  try{
+    const [appMod, authMod, fsMod] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+    ]);
+    fbModules = { ...appMod, ...authMod, ...fsMod };
+    fbApp = fbModules.getApps().length ? fbModules.getApp() : fbModules.initializeApp(cfg);
+    fbAuth = fbModules.getAuth(fbApp);
+    fbDb = fbModules.getFirestore(fbApp);
+    return true;
+  }catch(e){
+    console.error('Firebase load error:', e);
+    return false;
+  }
+}
+
+function getLocalShulsRegistry(){
+  try{
+    const raw = localStorage.getItem(LS_PREFIX + 'localShulsRegistry');
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+function saveLocalShulsRegistry(reg){
+  try{ localStorage.setItem(LS_PREFIX + 'localShulsRegistry', JSON.stringify(reg)); }catch(e){}
+}
+function getLocalUsersRegistry(){
+  try{
+    const raw = localStorage.getItem(LS_PREFIX + 'localUsersRegistry');
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+function saveLocalUsersRegistry(reg){
+  try{ localStorage.setItem(LS_PREFIX + 'localUsersRegistry', JSON.stringify(reg)); }catch(e){}
+}
+
+function buildCurrentShulPayload(){
+  return {
+    shulId: STATE.shulId || 'netzach-banim',
+    synagogueName: STATE.synagogueName || 'בית כנסת נצח בנים',
+    congregants: STATE.congregants,
+    weeklyLog: STATE.weeklyLog,
+    parashot: STATE.parashot,
+    current: STATE.current,
+    matchSettings: STATE.matchSettings,
+    whatsappTemplate: STATE.whatsappTemplate,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function applyShulSnapshotToState(data){
+  if(!data) return;
+  isApplyingCloudSnapshot = true;
+  try{
+    if(data.shulId) STATE.shulId = data.shulId;
+    if(data.synagogueName) STATE.synagogueName = data.synagogueName;
+    if(Array.isArray(data.congregants)) STATE.congregants = data.congregants;
+    if(Array.isArray(data.weeklyLog)) STATE.weeklyLog = data.weeklyLog;
+    if(data.parashot && typeof data.parashot === 'object') STATE.parashot = data.parashot;
+    if('current' in data) STATE.current = data.current;
+    if(data.matchSettings && typeof data.matchSettings === 'object') STATE.matchSettings = data.matchSettings;
+    if('whatsappTemplate' in data) STATE.whatsappTemplate = data.whatsappTemplate;
+    invalidateStatsCache();
+    await Store.set('shulId', STATE.shulId);
+    await Store.set('synagogueName', STATE.synagogueName);
+    await Store.set('congregants', JSON.stringify(STATE.congregants));
+    await Store.set('weeklyLog', JSON.stringify(STATE.weeklyLog));
+    await Store.set('parashot', JSON.stringify(STATE.parashot));
+    await Store.set('current', JSON.stringify(STATE.current));
+    await Store.set('matchSettings', JSON.stringify(STATE.matchSettings));
+    await Store.set('whatsappTemplate', STATE.whatsappTemplate || '');
+  }finally{
+    isApplyingCloudSnapshot = false;
+  }
+  render();
+}
+
+function scheduleCloudPush(){
+  if(isApplyingCloudSnapshot) return;
+  // Save snapshot to local multi-synagogue registry as well so switching synagogues locally preserves each shul's data
+  if(STATE.shulId){
+    const reg = getLocalShulsRegistry();
+    reg[STATE.shulId] = buildCurrentShulPayload();
+    saveLocalShulsRegistry(reg);
+  }
+  if(!fbDb || !fbModules || !STATE.authUser || STATE.authUser.mode !== 'cloud') return;
+  if(cloudPushTimer) clearTimeout(cloudPushTimer);
+  STATE.cloudSyncStatus = 'syncing';
+  cloudPushTimer = setTimeout(async ()=>{
+    try{
+      const shulRef = fbModules.doc(fbDb, 'shuls', STATE.shulId);
+      await fbModules.setDoc(shulRef, buildCurrentShulPayload(), { merge: true });
+      STATE.cloudSyncStatus = 'online';
+      render();
+    }catch(e){
+      console.error('Cloud push failed:', e);
+      STATE.cloudSyncStatus = 'error';
+      render();
+    }
+  }, 350);
+}
+
+async function subscribeToCloudShul(shulId){
+  if(activeShulUnsubscribe){
+    try{ activeShulUnsubscribe(); }catch(e){}
+    activeShulUnsubscribe = null;
+  }
+  if(!fbDb || !fbModules || !shulId) return;
+  STATE.cloudSyncStatus = 'connecting';
+  render();
+  const shulRef = fbModules.doc(fbDb, 'shuls', shulId);
+  activeShulUnsubscribe = fbModules.onSnapshot(shulRef, async (snap)=>{
+    STATE.cloudSyncStatus = 'online';
+    if(snap.exists()){
+      const remoteData = snap.data();
+      await applyShulSnapshotToState(remoteData);
+    } else {
+      // First time this shulId is created in cloud -> push our local state up!
+      await fbModules.setDoc(shulRef, buildCurrentShulPayload());
+      render();
+    }
+  }, (err)=>{
+    console.error('Firestore listener error:', err);
+    STATE.cloudSyncStatus = 'error';
+    render();
+  });
+}
+
+async function initCloudSyncIfConfigured(){
+  const cfg = getStoredFirebaseConfig();
+  if(!cfg) return;
+  const ok = await ensureFirebaseLoaded();
+  if(!ok) return;
+  fbModules.onAuthStateChanged(fbAuth, async (user)=>{
+    if(!user) return;
+    try{
+      const userRef = fbModules.doc(fbDb, 'users', user.uid);
+      const userSnap = await fbModules.getDoc(userRef);
+      let shulId = STATE.shulId || 'netzach-banim';
+      let synagogueName = STATE.synagogueName || 'בית כנסת נצח בנים';
+      if(userSnap.exists()){
+        const uData = userSnap.data();
+        if(uData.shulId) shulId = uData.shulId;
+        if(uData.synagogueName) synagogueName = uData.synagogueName;
+      } else {
+        await fbModules.setDoc(userRef, {
+          email: user.email || '',
+          displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי'),
+          shulId,
+          synagogueName,
+          updatedAt: new Date().toISOString()
+        });
+      }
+      STATE.shulId = shulId;
+      STATE.synagogueName = synagogueName;
+      STATE.authUser = {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי'),
+        shulId,
+        synagogueName,
+        mode: 'cloud'
+      };
+      await Store.set('authUser', JSON.stringify(STATE.authUser));
+      await subscribeToCloudShul(shulId);
+    }catch(e){
+      console.error('Auth state init error:', e);
+    }
+  });
+}
+
+async function handleLogout(){
+  if(activeShulUnsubscribe){
+    try{ activeShulUnsubscribe(); }catch(e){}
+    activeShulUnsubscribe = null;
+  }
+  if(fbAuth && fbModules){
+    try{ await fbModules.signOut(fbAuth); }catch(e){}
+  }
+  STATE.authUser = null;
+  STATE.cloudSyncStatus = 'local';
+  await Store.set('authUser', '');
+  render();
+}
+
+function renderAuthModal(){
+  const mode = STATE.authModal || 'login';
+  const hasCloudCfg = !!getStoredFirebaseConfig();
+  const backdrop = el(`<div class="modal-backdrop"></div>`);
+
+  let formHtml = '';
+  const googleBtnHtml = `
+    <button type="button" class="btn-google" id="authGoogleBtn">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      <span>${mode==='register' ? 'הירשם מהר באמצעות Google' : 'התחבר באמצעות Google'}</span>
+    </button>
+    <div class="auth-divider">או באמצעות אימייל וסיסמה</div>
+  `;
+
+  if(mode === 'login'){
+    formHtml = `
+      ${googleBtnHtml}
+      <div class="field"><label>אימייל או שם משתמש</label><input type="email" id="authEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
+      <div class="field"><label>סיסמה</label><input type="password" id="authPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>
+        <button type="button" class="btn btn-gold" id="submitLoginBtn">🔑 התחבר למערכת</button>
+      </div>
+    `;
+  } else if(mode === 'register'){
+    formHtml = `
+      <div class="field"><label>שם בית הכנסת</label><input type="text" id="regShulName" placeholder="למשל: בית כנסת נצח בנים" value="${escHtml(STATE.synagogueName || '')}"></div>
+      <div class="field"><label>שם הגבאי</label><input type="text" id="regGabbaiName" placeholder="למשל: נעם בן אהרון"></div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
+          <input type="checkbox" id="regKeepCurrentData" style="width:auto;" ${STATE.synagogueName==='בית כנסת נצח בנים' ? 'checked' : ''}>
+          שמור את רשימת המתפללים וההיסטוריה הקיימים כרגע במכשיר זה (מתאים להקמת "נצח בנים"; עבור בית כנסת חדש — בטל סימון כדי להתחיל מרשימה ריקה)
+        </label>
+      </div>
+      ${googleBtnHtml}
+      <div class="field"><label>אימייל</label><input type="email" id="regEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
+      <div class="field"><label>סיסמה (לפחות 6 תווים)</label><input type="password" id="regPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>
+        <button type="button" class="btn btn-gold" id="submitRegBtn">✨ צור חשבון בית כנסת</button>
+      </div>
+    `;
+  } else if(mode === 'join'){
+    formHtml = `
+      <div class="note" style="margin-top:0;">כדי להסתנכרן עם גבאי אחר (למשל בין אבא שלך לבינך), הזן את <b>קוד השיתוף בן 6 התווים</b> של בית הכנסת והתחבר:</div>
+      <div class="field" style="margin-top:10px;"><label>קוד שיתוף גבאים (6 תווים)</label><input type="text" id="joinShulCode" placeholder="למשל: NB2026" value="${escHtml(STATE.pendingJoinCode || '')}" dir="ltr" style="text-align:center;font-weight:900;letter-spacing:3px;font-size:18px;text-transform:uppercase;"></div>
+      <div class="field"><label>השם שלך (גבאי שותף)</label><input type="text" id="joinGabbaiName" placeholder="למשל: אבא / גבאי"></div>
+      ${googleBtnHtml}
+      <div class="field"><label>אימייל</label><input type="email" id="joinEmail" placeholder="gabbai@gmail.com" dir="ltr" style="text-align:left;"></div>
+      <div class="field"><label>סיסמה (לפחות 6 תווים)</label><input type="password" id="joinPass" placeholder="••••••••" dir="ltr" style="text-align:left;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-outline" id="closeAuthModal">סגירה</button>
+        <button type="button" class="btn btn-gold" id="submitJoinBtn">🤝 התחבר והסתנכרן</button>
+      </div>
+    `;
+  }
+
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <h3 style="margin-bottom:6px;">🔐 כניסת גבאים וסנכרון ענן</h3>
+      <div class="note" style="margin-top:0;margin-bottom:12px;">התחבר לחשבון בית הכנסת כדי לסנכרן נתונים בין מכשירים (למשל בינך לבין אבא שלך), או פתח חשבון חדש ונפרד לבית כנסת אחר.</div>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn ${mode==='login'?'active':''}" data-auth-tab="login">🔑 התחברות</button>
+        <button type="button" class="auth-tab-btn ${mode==='register'?'active':''}" data-auth-tab="register">✨ הרשמה (חדש)</button>
+        <button type="button" class="auth-tab-btn ${mode==='join'?'active':''}" data-auth-tab="join">🤝 הצטרפות עם קוד</button>
+      </div>
+      ${formHtml}
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <span class="mini">${hasCloudCfg ? '🟢 שרת ענן Firebase מוגדר ופעיל' : '⚙ סנכרון בין מכשירים דורש חיבור Firebase (חינמי, דקה אחת)'}</span>
+        <button type="button" class="btn btn-outline btn-sm" id="openCloudConfigFromAuth">☁️ ${hasCloudCfg ? 'הגדרות שרת ענן' : 'חבר שרת Firebase'}</button>
+      </div>
+    </div>
+  `;
+
+  setTimeout(()=>{
+    backdrop.querySelectorAll('[data-auth-tab]').forEach(btn=>{
+      btn.onclick = ()=>{
+        STATE.authModal = btn.getAttribute('data-auth-tab');
+        render();
+      };
+    });
+    const closeBtn = backdrop.querySelector('#closeAuthModal');
+    if(closeBtn) closeBtn.onclick = ()=>{ STATE.authModal = null; render(); };
+
+    const cfgBtn = backdrop.querySelector('#openCloudConfigFromAuth');
+    if(cfgBtn) cfgBtn.onclick = ()=>{
+      STATE.authModal = null;
+      STATE.cloudConfigModal = true;
+      render();
+    };
+
+    const googleBtn = backdrop.querySelector('#authGoogleBtn');
+    if(googleBtn) googleBtn.onclick = async ()=>{
+      if(!hasCloudCfg){
+        STATE.authModal = null;
+        STATE.cloudConfigModal = true;
+        render();
+        return;
+      }
+      const ok = await ensureFirebaseLoaded();
+      if(!ok){ notice('לא ניתן לטעון את חיבור Google כרגע. בדוק את החיבור לאינטרנט ואת הגדרות ה-Firebase.'); return; }
+      try{
+        const provider = new fbModules.GoogleAuthProvider();
+        const res = await fbModules.signInWithPopup(fbAuth, provider);
+        const user = res.user;
+        await finalizeAuthenticatedSession(user, mode, backdrop);
+      }catch(e){
+        notice('ההתחברות עם Google לא הושלמה: ' + (e && e.message ? e.message : 'שגיאה'));
+      }
+    };
+
+    const loginBtn = backdrop.querySelector('#submitLoginBtn');
+    if(loginBtn) loginBtn.onclick = async ()=>{
+      const email = (backdrop.querySelector('#authEmail').value || '').trim().toLowerCase();
+      const pass = backdrop.querySelector('#authPass').value || '';
+      if(!email || !pass){ notice('יש להזין אימייל וסיסמה.'); return; }
+      if(hasCloudCfg && await ensureFirebaseLoaded()){
+        try{
+          const res = await fbModules.signInWithEmailAndPassword(fbAuth, email, pass);
+          await finalizeAuthenticatedSession(res.user, 'login', backdrop);
+          return;
+        }catch(e){
+          notice('פרטי ההתחברות שגויים או שהמשתמש אינו קיים בענן (' + (e.code || e.message) + ').');
+          return;
+        }
+      }
+      // Local multi-synagogue login
+      const users = getLocalUsersRegistry();
+      const u = users[email];
+      if(!u || u.pass !== pass){
+        notice('אימייל או סיסמה לא נמצאו. אם טרם נרשמת, עבור ללשונית "✨ הרשמה (חדש)".');
+        return;
+      }
+      const shuls = getLocalShulsRegistry();
+      if(shuls[u.shulId]) await applyShulSnapshotToState(shuls[u.shulId]);
+      STATE.authUser = { uid: email, email, displayName: u.displayName || email, shulId: u.shulId, synagogueName: STATE.synagogueName, mode: 'local' };
+      await Store.set('authUser', JSON.stringify(STATE.authUser));
+      STATE.authModal = null;
+      render();
+      notice(`ברוך הבא, ${STATE.authUser.displayName}! מחובר ל-${STATE.synagogueName}.`);
+    };
+
+    const regBtn = backdrop.querySelector('#submitRegBtn');
+    if(regBtn) regBtn.onclick = async ()=>{
+      const shulName = (backdrop.querySelector('#regShulName').value || '').trim();
+      const gabbaiName = (backdrop.querySelector('#regGabbaiName').value || '').trim();
+      const keepData = backdrop.querySelector('#regKeepCurrentData').checked;
+      const email = (backdrop.querySelector('#regEmail').value || '').trim().toLowerCase();
+      const pass = backdrop.querySelector('#regPass').value || '';
+      if(!shulName){ notice('יש להזין את שם בית הכנסת.'); return; }
+      if(!email || pass.length < 6){ notice('יש להזין אימייל תקין וסיסמה בת 6 תווים לפחות.'); return; }
+      if(hasCloudCfg && await ensureFirebaseLoaded()){
+        try{
+          const res = await fbModules.createUserWithEmailAndPassword(fbAuth, email, pass);
+          await finalizeAuthenticatedSession(res.user, 'register', backdrop);
+          return;
+        }catch(e){
+          notice('לא ניתן ליצור את החשבון בענן: ' + (e.code || e.message));
+          return;
+        }
+      }
+      // Local multi-synagogue registration
+      const shulId = keepData && shulName === 'בית כנסת נצח בנים' ? 'NETZACH' : generateShulShareCode();
+      // Save current shul before switching
+      if(STATE.shulId){
+        const reg = getLocalShulsRegistry();
+        reg[STATE.shulId] = buildCurrentShulPayload();
+        saveLocalShulsRegistry(reg);
+      }
+      STATE.shulId = shulId;
+      STATE.synagogueName = shulName;
+      if(!keepData){
+        STATE.congregants = [];
+        STATE.weeklyLog = [];
+        STATE.parashot = {};
+        STATE.current = null;
+      }
+      await applyShulSnapshotToState(buildCurrentShulPayload());
+      const shuls = getLocalShulsRegistry();
+      shuls[shulId] = buildCurrentShulPayload();
+      saveLocalShulsRegistry(shuls);
+      const users = getLocalUsersRegistry();
+      users[email] = { email, pass, displayName: gabbaiName || email.split('@')[0], shulId, synagogueName: shulName };
+      saveLocalUsersRegistry(users);
+      STATE.authUser = { uid: email, email, displayName: gabbaiName || email.split('@')[0], shulId, synagogueName: shulName, mode: 'local' };
+      await Store.set('authUser', JSON.stringify(STATE.authUser));
+      STATE.authModal = null;
+      STATE.shareModal = true;
+      render();
+    };
+
+    const joinBtn = backdrop.querySelector('#submitJoinBtn');
+    if(joinBtn) joinBtn.onclick = async ()=>{
+      const code = (backdrop.querySelector('#joinShulCode').value || '').trim().toUpperCase();
+      const gabbaiName = (backdrop.querySelector('#joinGabbaiName').value || '').trim();
+      const email = (backdrop.querySelector('#joinEmail').value || '').trim().toLowerCase();
+      const pass = backdrop.querySelector('#joinPass').value || '';
+      if(!code || code.length < 4){ notice('יש להזין קוד שיתוף גבאים תקין.'); return; }
+      if(!email || pass.length < 6){ notice('יש להזין אימייל וסיסמה (לפחות 6 תווים).'); return; }
+      if(hasCloudCfg && await ensureFirebaseLoaded()){
+        try{
+          let user;
+          try{
+            const res = await fbModules.signInWithEmailAndPassword(fbAuth, email, pass);
+            user = res.user;
+          }catch(signInErr){
+            const res = await fbModules.createUserWithEmailAndPassword(fbAuth, email, pass);
+            user = res.user;
+          }
+          await finalizeAuthenticatedSession(user, 'join', backdrop);
+          return;
+        }catch(e){
+          notice('שגיאה בהצטרפות בענן: ' + (e.code || e.message));
+          return;
+        }
+      }
+      const shuls = getLocalShulsRegistry();
+      if(!shuls[code]){
+        notice('לחיבור בין שני מכשירים שונים (למשל הטלפון של אבא שלך והמחשב שלך), יש לחבר תחילה את שרת הענן (כפתור "☁️ חבר שרת Firebase" למטה).');
+        return;
+      }
+      await applyShulSnapshotToState(shuls[code]);
+      const users = getLocalUsersRegistry();
+      users[email] = { email, pass, displayName: gabbaiName || email.split('@')[0], shulId: code, synagogueName: STATE.synagogueName };
+      saveLocalUsersRegistry(users);
+      STATE.authUser = { uid: email, email, displayName: gabbaiName || email.split('@')[0], shulId: code, synagogueName: STATE.synagogueName, mode: 'local' };
+      await Store.set('authUser', JSON.stringify(STATE.authUser));
+      STATE.authModal = null;
+      render();
+      notice(`התחברת בהצלחה ל-${STATE.synagogueName}!`);
+    };
+  },0);
+
+  return backdrop;
+}
+
+async function finalizeAuthenticatedSession(user, mode, backdrop){
+  let shulId = STATE.shulId || 'NETZACH';
+  let shulName = STATE.synagogueName || 'בית כנסת נצח בנים';
+  let displayName = user.displayName || (user.email ? user.email.split('@')[0] : 'גבאי');
+
+  if(mode === 'register'){
+    const inpShul = backdrop.querySelector('#regShulName');
+    const inpName = backdrop.querySelector('#regGabbaiName');
+    const keepChk = backdrop.querySelector('#regKeepCurrentData');
+    shulName = (inpShul && inpShul.value.trim()) || 'בית כנסת חדש';
+    if(inpName && inpName.value.trim()) displayName = inpName.value.trim();
+    const keepData = keepChk ? keepChk.checked : false;
+    shulId = (keepData && shulName === 'בית כנסת נצח בנים') ? 'NETZACH' : generateShulShareCode();
+    STATE.shulId = shulId;
+    STATE.synagogueName = shulName;
+    if(!keepData){
+      STATE.congregants = [];
+      STATE.weeklyLog = [];
+      STATE.parashot = {};
+      STATE.current = null;
+      await applyShulSnapshotToState(buildCurrentShulPayload());
+    }
+    const shulRef = fbModules.doc(fbDb, 'shuls', shulId);
+    await fbModules.setDoc(shulRef, buildCurrentShulPayload(), { merge: true });
+    await fbModules.setDoc(fbModules.doc(fbDb, 'users', user.uid), {
+      email: user.email || '',
+      displayName,
+      shulId,
+      synagogueName: shulName,
+      updatedAt: new Date().toISOString()
+    });
+  } else if(mode === 'join'){
+    const inpCode = backdrop.querySelector('#joinShulCode');
+    const inpName = backdrop.querySelector('#joinGabbaiName');
+    const code = (inpCode && inpCode.value.trim().toUpperCase()) || STATE.pendingJoinCode || 'NETZACH';
+    if(inpName && inpName.value.trim()) displayName = inpName.value.trim();
+    const shulRef = fbModules.doc(fbDb, 'shuls', code);
+    const snap = await fbModules.getDoc(shulRef);
+    if(!snap.exists()){
+      notice(`לא נמצא בית כנסת עם קוד השיתוף "${code}". ודא שהקוד הוקלד נכון.`);
+      return;
+    }
+    const remoteData = snap.data();
+    shulId = code;
+    shulName = remoteData.synagogueName || 'בית כנסת';
+    await applyShulSnapshotToState(remoteData);
+    await fbModules.setDoc(fbModules.doc(fbDb, 'users', user.uid), {
+      email: user.email || '',
+      displayName,
+      shulId,
+      synagogueName: shulName,
+      updatedAt: new Date().toISOString()
+    });
+  } else {
+    // Login mode: look up user's assigned shulId in Firestore
+    const userRef = fbModules.doc(fbDb, 'users', user.uid);
+    const userSnap = await fbModules.getDoc(userRef);
+    if(userSnap.exists()){
+      const uData = userSnap.data();
+      shulId = uData.shulId || 'NETZACH';
+      shulName = uData.synagogueName || STATE.synagogueName;
+      if(uData.displayName) displayName = uData.displayName;
+    } else {
+      shulId = STATE.shulId && STATE.shulId !== 'netzach-banim' ? STATE.shulId : 'NETZACH';
+      await fbModules.setDoc(userRef, {
+        email: user.email || '',
+        displayName,
+        shulId,
+        synagogueName: shulName,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }
+
+  STATE.shulId = shulId;
+  STATE.synagogueName = shulName;
+  STATE.authUser = { uid: user.uid, email: user.email || '', displayName, shulId, synagogueName: shulName, mode: 'cloud' };
+  await Store.set('shulId', shulId);
+  await Store.set('synagogueName', shulName);
+  await Store.set('authUser', JSON.stringify(STATE.authUser));
+  STATE.authModal = null;
+  await subscribeToCloudShul(shulId);
+  render();
+}
+
+function renderShareModal(){
+  const shulCode = (STATE.shulId && STATE.shulId !== 'netzach-banim') ? STATE.shulId : 'NETZACH';
+  const baseUrl = (typeof location !== 'undefined') ? (location.origin + location.pathname) : 'https://noam-ben-aharon.github.io/shibutz-aliyot/';
+  const inviteUrl = `${baseUrl}?join=${encodeURIComponent(shulCode)}`;
+  const waInviteText = `שלום! הנה קישור ההצטרפות והסנכרון למערכת שיבוץ העליות של ${STATE.synagogueName} (קוד שיתוף: ${shulCode}):\n${inviteUrl}`;
+  const waInviteLink = `https://wa.me/?text=${encodeURIComponent(waInviteText)}`;
+
+  const backdrop = el(`<div class="modal-backdrop"></div>`);
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:460px;">
+      <h3>🤝 שיתוף וסנכרון גבאים — ${escHtml(STATE.synagogueName)}</h3>
+      <div class="note">כל גבאי נוסף של בית הכנסת (למשל אבא שלך) שيتחבר עם הקוד הזה או דרך הקישור המהיר למטה, יראה ויעדכן <b>בדיוק את אותם נתונים בזמן אמת</b>:</div>
+      <div class="share-code-box">${escHtml(shulCode)}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        <a class="btn btn-gold" href="${waInviteLink}" target="_blank" style="flex:1;text-align:center;text-decoration:none;">📱 שלח קישור התחברות לאבא בוואטסאפ</a>
+      </div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-outline" id="closeShareModal" style="flex:1;">סגירה</button>
+      </div>
+    </div>
+  `;
+  setTimeout(()=>{
+    const closeBtn = backdrop.querySelector('#closeShareModal');
+    if(closeBtn) closeBtn.onclick = ()=>{ STATE.shareModal = false; render(); };
+  },0);
+  return backdrop;
+}
+
+function renderCloudConfigModal(){
+  const existing = getStoredFirebaseConfig();
+  const backdrop = el(`<div class="modal-backdrop"></div>`);
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:540px;">
+      <h3>☁️ חיבור שרת ענן Google Firebase</h3>
+      <div class="note" style="margin-top:0;">
+        כדי שהתחברות עם Google וסנכרון חי בין מכשירים שונים יעבדו בענן של גוגל (חינמי לגמרי):
+        <ol style="margin:8px 0 0;padding-right:20px;line-height:1.7;">
+          <li>היכנס ל-<a href="https://console.firebase.google.com/" target="_blank" style="color:var(--gold-deep);font-weight:800;">Firebase Console</a> וצור פרויקט חינמי חדש.</li>
+          <li>בתפריט <b>Authentication</b> הפעל <b>Google</b> ו-<b>Email/Password</b>.</li>
+          <li>בתפריט <b>Firestore Database</b> לחץ <b>Create database</b> (במצב Test / Production).</li>
+          <li>בהגדרות הפרויקט הוסף אפליקציית Web (<code>&lt;/&gt;</code>) והדבק כאן למטה את ה-<code>firebaseConfig</code> (או שלח אותו בצ'אט כדי שיוטמע קבוע בקוד האתר!).</li>
+        </ol>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>הדבק כאן את ה-firebaseConfig מ-Firebase</label>
+        <textarea id="fbConfigInput" rows="6" dir="ltr" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--line);font-family:monospace;font-size:12.5px;text-align:left;" placeholder='const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "...",\n  projectId: "..."\n};'>${existing ? escHtml(JSON.stringify(existing, null, 2)) : ''}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="closeCloudCfgBtn">ביטול</button>
+        ${existing ? `<button type="button" class="btn btn-danger" id="clearCloudCfgBtn">נתק שרת</button>` : ''}
+        <button type="button" class="btn btn-gold" id="saveCloudCfgBtn">💾 שמור והתחבר לענן</button>
+      </div>
+    </div>
+  `;
+  setTimeout(()=>{
+    backdrop.querySelector('#closeCloudCfgBtn').onclick = ()=>{ STATE.cloudConfigModal = false; render(); };
+    const clearBtn = backdrop.querySelector('#clearCloudCfgBtn');
+    if(clearBtn) clearBtn.onclick = ()=>{
+      localStorage.removeItem(LS_PREFIX + 'firebaseConfig');
+      fbApp = null; fbAuth = null; fbDb = null;
+      STATE.cloudConfigModal = false;
+      STATE.cloudSyncStatus = 'local';
+      render();
+      notice('החיבור לשרת הענן הוסר מהמכשיר.');
+    };
+    backdrop.querySelector('#saveCloudCfgBtn').onclick = async ()=>{
+      const raw = backdrop.querySelector('#fbConfigInput').value;
+      const parsed = parseFirebaseConfigInput(raw);
+      if(!parsed){
+        notice('לא זוהה מבנה firebaseConfig תקין (חובה שיכלול לפחות apiKey ו-projectId). אפשר להדביק את כל קטע הקוד כמו שהוא מ-Firebase.');
+        return;
+      }
+      localStorage.setItem(LS_PREFIX + 'firebaseConfig', JSON.stringify(parsed));
+      fbApp = null; fbAuth = null; fbDb = null;
+      STATE.cloudConfigModal = false;
+      STATE.authModal = 'login';
+      await initCloudSyncIfConfigured();
+      render();
+      notice('שרת Firebase חובר בהצלחה! כעת ניתן להתחבר עם Google או אימייל וסיסמה.');
+    };
+  },0);
+  return backdrop;
 }
 
 function pushBackGuardState(){
