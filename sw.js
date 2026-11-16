@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shibutz-aliyot-v3';
+const CACHE_NAME = 'shibutz-aliyot-v5';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -16,12 +16,12 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Network-first strategy so live updates on GitHub Pages always show immediately,
-// falling back to cache when offline.
+// Always fetch fresh HTML from network (bypassing HTTP disk cache) so updates appear immediately,
+// falling back to Service Worker cache only when offline.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-store' })
       .then((res) => {
         if (res && res.status === 200 && res.type === 'basic') {
           const clone = res.clone();
